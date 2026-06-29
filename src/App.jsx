@@ -1,35 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  Plus, 
-  Trash2, 
-  CreditCard, 
-  Wallet, 
-  Target, 
-  MessageSquare, 
-  BarChart3, 
-  DollarSign, 
-  User, 
-  Sun, 
-  Moon, 
-  AlertTriangle, 
-  ChevronRight, 
-  PlusCircle, 
-  ArrowRight,
-  TrendingUp as Gain,
-  ShieldCheck,
-  Zap,
-  HelpCircle,
-  FolderMinus,
-  Sparkles,
-  RefreshCw,
-  Coins,
-  CheckCircle2,
-  X
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  BarChart3, Wallet, Target, MessageSquare, Plus, Trash2,
+  TrendingUp, TrendingDown, ChevronRight, ArrowRight, X,
+  AlertTriangle, Sparkles, Coins, CreditCard, Settings,
+  PieChart, BookOpen, DollarSign, HelpCircle
 } from 'lucide-react';
 
-// Predefined categories with colors and emojis
+/* =============================================
+   CONSTANTS
+   ============================================= */
 const CATEGORIES = [
   { name: 'Makanan & Minuman', icon: '🍔', color: '#ffb7b2' },
   { name: 'Transportasi', icon: '🚗', color: '#b388ff' },
@@ -38,1461 +17,899 @@ const CATEGORIES = [
   { name: 'Kesehatan', icon: '🏥', color: '#81c784' },
   { name: 'Pendidikan', icon: '📚', color: '#a1887f' },
   { name: 'Belanja', icon: '🛍️', color: '#f06292' },
-  { name: 'Investasi', icon: '📈', color: '#ccff00' },
+  { name: 'Tagihan & Utilitas', icon: '💡', color: '#ffd54f' },
   { name: 'Lainnya', icon: '🏷️', color: '#90a4ae' }
 ];
 
+const TABS = [
+  { id: 'home', label: 'Beranda', Icon: BarChart3 },
+  { id: 'wallets', label: 'Dompet', Icon: Wallet },
+  { id: 'budgets', label: 'Budget', Icon: PieChart },
+  { id: 'goals', label: 'Target', Icon: Target },
+  { id: 'ai', label: 'AI', Icon: Sparkles },
+];
+
+/* =============================================
+   HELPERS
+   ============================================= */
+const fmt = (v) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(v);
+const genId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const curMonth = () => new Date().toISOString().substring(0, 7);
+const load = (key, fallback) => { try { const d = localStorage.getItem(key); return d ? JSON.parse(d) : fallback; } catch { return fallback; } };
+
+/* =============================================
+   APP
+   ============================================= */
 export default function App() {
-  // Navigation & Auth Flow
-  const [currentTab, setCurrentTab] = useState('landing'); // 'landing', 'dashboard', 'wallets', 'transactions', 'budgets', 'goals', 'debts', 'investments', 'ai'
-  const [theme, setTheme] = useState('dark');
-  const [userProfile, setUserProfile] = useState({ name: 'Pengguna Setia', email: 'user@budggt.com' });
+  const [tab, setTab] = useState('landing');
+  const [modal, setModal] = useState(null); // null | 'tx' | 'wallet' | 'budget' | 'goal' | 'debt' | 'invest'
 
-  // Core App States (hydrated from localStorage)
-  const [wallets, setWallets] = useState(() => {
-    const saved = localStorage.getItem('budggt_wallets');
-    return saved ? JSON.parse(saved) : [
-      { id: '1', name: 'Dompet Cash', balance: 500000, type: 'cash', emoji: '💵' },
-      { id: '2', name: 'Bank BCA', balance: 2500000, type: 'bank', emoji: '🏦' },
-      { id: '3', name: 'GoPay', balance: 150000, type: 'e-wallet', emoji: '📱' }
-    ];
-  });
+  // Data stores
+  const [wallets, setWallets] = useState(() => load('bg_wallets', [
+    { id: 'w1', name: 'Dompet Cash', balance: 500000, type: 'cash', emoji: '💵' },
+    { id: 'w2', name: 'Bank BCA', balance: 2500000, type: 'bank', emoji: '🏦' },
+    { id: 'w3', name: 'GoPay', balance: 150000, type: 'e-wallet', emoji: '📱' },
+  ]));
 
-  const [transactions, setTransactions] = useState(() => {
-    const saved = localStorage.getItem('budggt_transactions');
-    return saved ? JSON.parse(saved) : [
-      { id: '1', type: 'expense', amount: 35000, category: 'Makanan & Minuman', walletId: '1', date: '2026-06-28', note: 'Makan Siang Bakso' },
-      { id: '2', type: 'income', amount: 3500000, category: 'Gaji', walletId: '2', date: '2026-06-25', note: 'Gaji Bulanan' },
-      { id: '3', type: 'expense', amount: 120000, category: 'Transportasi', walletId: '2', date: '2026-06-27', note: 'Bensin & Tol' },
-      { id: '4', type: 'expense', amount: 50000, category: 'Hiburan', walletId: '3', date: '2026-06-28', note: 'Topup Game' }
-    ];
-  });
+  const [txns, setTxns] = useState(() => load('bg_txns', [
+    { id: 't1', type: 'income', amount: 3500000, category: 'Gaji', walletId: 'w2', date: '2026-06-25', note: 'Gaji Bulanan' },
+    { id: 't2', type: 'expense', amount: 35000, category: 'Makanan & Minuman', walletId: 'w1', date: '2026-06-28', note: 'Makan Siang Bakso' },
+    { id: 't3', type: 'expense', amount: 120000, category: 'Transportasi', walletId: 'w2', date: '2026-06-27', note: 'Bensin & Tol' },
+    { id: 't4', type: 'expense', amount: 50000, category: 'Hiburan', walletId: 'w3', date: '2026-06-28', note: 'Topup Game' },
+    { id: 't5', type: 'expense', amount: 250000, category: 'Belanja', walletId: 'w2', date: '2026-06-26', note: 'Beli baju online' },
+  ]));
 
-  const [budgets, setBudgets] = useState(() => {
-    const saved = localStorage.getItem('budggt_budgets');
-    return saved ? JSON.parse(saved) : [
-      { category: 'Makanan & Minuman', limit: 1200000 },
-      { category: 'Transportasi', limit: 500000 },
-      { category: 'Hiburan', limit: 300000 }
-    ];
-  });
+  const [budgets, setBudgets] = useState(() => load('bg_budgets', [
+    { category: 'Makanan & Minuman', limit: 1200000 },
+    { category: 'Transportasi', limit: 500000 },
+    { category: 'Hiburan', limit: 300000 },
+  ]));
 
-  const [goals, setGoals] = useState(() => {
-    const saved = localStorage.getItem('budggt_goals');
-    return saved ? JSON.parse(saved) : [
-      { id: '1', name: 'Dana Darurat', target: 5000000, current: 1500000, deadline: '2026-12-31' },
-      { id: '2', name: 'Beli Gadget Baru', target: 8000000, current: 2000000, deadline: '2027-03-15' }
-    ];
-  });
+  const [goals, setGoals] = useState(() => load('bg_goals', [
+    { id: 'g1', name: 'Dana Darurat', target: 5000000, current: 1500000, deadline: '2026-12-31' },
+    { id: 'g2', name: 'Beli Gadget Baru', target: 8000000, current: 2000000, deadline: '2027-03-15' },
+  ]));
 
-  const [debts, setDebts] = useState(() => {
-    const saved = localStorage.getItem('budggt_debts');
-    return saved ? JSON.parse(saved) : [
-      { id: '1', name: 'Hutang ke Andi', amount: 200000, type: 'debt', status: 'unpaid', dueDate: '2026-07-10' },
-      { id: '2', name: 'Piutang Budi (Pinjam)', amount: 150000, type: 'receivable', status: 'unpaid', dueDate: '2026-07-05' }
-    ];
-  });
+  const [debts, setDebts] = useState(() => load('bg_debts', [
+    { id: 'd1', name: 'Hutang ke Andi', amount: 200000, type: 'debt', status: 'unpaid', dueDate: '2026-07-10' },
+    { id: 'd2', name: 'Piutang Budi', amount: 150000, type: 'receivable', status: 'unpaid', dueDate: '2026-07-05' },
+  ]));
 
-  const [investments, setInvestments] = useState(() => {
-    const saved = localStorage.getItem('budggt_investments');
-    return saved ? JSON.parse(saved) : [
-      { id: '1', name: 'Emas Antam', value: 3200000, qty: '3 gram', type: 'commodity' },
-      { id: '2', name: 'Reksadana Saham', value: 1500000, qty: '1000 unit', type: 'mutual-fund' }
-    ];
-  });
+  const [investments, setInvestments] = useState(() => load('bg_investments', [
+    { id: 'i1', name: 'Emas Antam', value: 3200000, qty: '3 gram', type: 'commodity' },
+    { id: 'i2', name: 'Reksadana Saham', value: 1500000, qty: '1000 unit', type: 'mutual-fund' },
+  ]));
 
-  // AI Chat Messages State
-  const [chatMessages, setChatMessages] = useState([
-    { role: 'assistant', text: 'Halo! Saya AI Konsultan Finansial Budggt. Saya siap menganalisis data keuanganmu untuk memberikan tips hemat terbaik. Ajukan pertanyaanmu!' }
+  const [chatMsgs, setChatMsgs] = useState([
+    { role: 'ai', text: 'Halo! 👋 Saya asisten AI keuangan Budggt. Saya bisa menganalisis transaksi, saldo dompet, dan anggaranmu. Tanyakan apa saja!' }
   ]);
   const [chatInput, setChatInput] = useState('');
+  const chatEndRef = useRef(null);
 
-  // Modals / Transaction Form Fields
-  const [showTxModal, setShowTxModal] = useState(false);
-  const [txType, setTxType] = useState('expense');
-  const [txAmount, setTxAmount] = useState('');
-  const [txCategory, setTxCategory] = useState('Makanan & Minuman');
-  const [txWalletId, setTxWalletId] = useState('1');
-  const [txDate, setTxDate] = useState(new Date().toISOString().substring(0, 10));
-  const [txNote, setTxNote] = useState('');
+  // Persist
+  useEffect(() => { localStorage.setItem('bg_wallets', JSON.stringify(wallets)); }, [wallets]);
+  useEffect(() => { localStorage.setItem('bg_txns', JSON.stringify(txns)); }, [txns]);
+  useEffect(() => { localStorage.setItem('bg_budgets', JSON.stringify(budgets)); }, [budgets]);
+  useEffect(() => { localStorage.setItem('bg_goals', JSON.stringify(goals)); }, [goals]);
+  useEffect(() => { localStorage.setItem('bg_debts', JSON.stringify(debts)); }, [debts]);
+  useEffect(() => { localStorage.setItem('bg_investments', JSON.stringify(investments)); }, [investments]);
 
-  // Save states to localStorage
-  useEffect(() => {
-    localStorage.setItem('budggt_wallets', JSON.stringify(wallets));
-  }, [wallets]);
+  // Scroll chat
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatMsgs]);
 
-  useEffect(() => {
-    localStorage.setItem('budggt_transactions', JSON.stringify(transactions));
-  }, [transactions]);
+  // Computations
+  const totalBalance = wallets.reduce((a, w) => a + w.balance, 0);
+  const totalInvestment = investments.reduce((a, i) => a + i.value, 0);
+  const totalDebt = debts.filter(d => d.type === 'debt' && d.status === 'unpaid').reduce((a, d) => a + d.amount, 0);
+  const totalReceivable = debts.filter(d => d.type === 'receivable' && d.status === 'unpaid').reduce((a, d) => a + d.amount, 0);
 
-  useEffect(() => {
-    localStorage.setItem('budggt_budgets', JSON.stringify(budgets));
-  }, [budgets]);
+  const mTxns = txns.filter(t => t.date.startsWith(curMonth()));
+  const mIncome = mTxns.filter(t => t.type === 'income').reduce((a, t) => a + t.amount, 0);
+  const mExpense = mTxns.filter(t => t.type === 'expense').reduce((a, t) => a + t.amount, 0);
 
-  useEffect(() => {
-    localStorage.setItem('budggt_goals', JSON.stringify(goals));
-  }, [goals]);
+  const catSpend = (cat) => mTxns.filter(t => t.type === 'expense' && t.category === cat).reduce((a, t) => a + t.amount, 0);
 
-  useEffect(() => {
-    localStorage.setItem('budggt_debts', JSON.stringify(debts));
-  }, [debts]);
-
-  useEffect(() => {
-    localStorage.setItem('budggt_investments', JSON.stringify(investments));
-  }, [investments]);
-
-  // Set HTML theme attribute
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-  }, [theme]);
-
-  // Calculations
-  const formatCurrency = (val) => {
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val);
+  // ---- CRUD Handlers ----
+  const addTx = (tx) => {
+    const newTx = { ...tx, id: genId() };
+    setTxns(prev => [newTx, ...prev]);
+    setWallets(prev => prev.map(w => w.id === tx.walletId
+      ? { ...w, balance: tx.type === 'income' ? w.balance + tx.amount : w.balance - tx.amount }
+      : w
+    ));
+    setModal(null);
   };
 
-  const totalWalletBalance = wallets.reduce((acc, w) => acc + w.balance, 0);
-  const totalInvestmentValue = investments.reduce((acc, i) => acc + i.value, 0);
-  const totalReceivables = debts.filter(d => d.type === 'receivable' && d.status === 'unpaid').reduce((acc, d) => acc + d.amount, 0);
-  const totalDebts = debts.filter(d => d.type === 'debt' && d.status === 'unpaid').reduce((acc, d) => acc + d.amount, 0);
-  const netWorth = totalWalletBalance + totalInvestmentValue + totalReceivables - totalDebts;
-
-  // Transactions calculations for current month
-  const currentMonth = new Date().toISOString().substring(0, 7); // "YYYY-MM"
-  const monthlyTransactions = transactions.filter(t => t.date.startsWith(currentMonth));
-  const monthlyIncome = monthlyTransactions.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0);
-  const monthlyExpense = monthlyTransactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0);
-
-  // Category actual spend
-  const categorySpend = (catName) => {
-    return monthlyTransactions
-      .filter(t => t.type === 'expense' && t.category === catName)
-      .reduce((acc, t) => acc + t.amount, 0);
+  const delTx = (tx) => {
+    setTxns(prev => prev.filter(t => t.id !== tx.id));
+    setWallets(prev => prev.map(w => w.id === tx.walletId
+      ? { ...w, balance: tx.type === 'income' ? w.balance - tx.amount : w.balance + tx.amount }
+      : w
+    ));
   };
 
-  // Add Wallet
-  const handleAddWallet = (e) => {
-    e.preventDefault();
-    const name = e.target.walletName.value;
-    const balance = parseFloat(e.target.walletBalance.value) || 0;
-    const type = e.target.walletType.value;
-    const emoji = e.target.walletEmoji.value || '💳';
-    if (!name) return;
+  const addWallet = (w) => { setWallets(prev => [...prev, { ...w, id: genId() }]); setModal(null); };
+  const delWallet = (id) => setWallets(prev => prev.filter(w => w.id !== id));
 
-    setWallets([...wallets, {
-      id: Date.now().toString(),
-      name,
-      balance,
-      type,
-      emoji
-    }]);
-    e.target.reset();
+  const addBudget = (b) => {
+    setBudgets(prev => {
+      const exists = prev.find(x => x.category === b.category);
+      return exists ? prev.map(x => x.category === b.category ? b : x) : [...prev, b];
+    });
+    setModal(null);
   };
+  const delBudget = (cat) => setBudgets(prev => prev.filter(b => b.category !== cat));
 
-  // Delete Wallet
-  const handleDeleteWallet = (id) => {
-    setWallets(wallets.filter(w => w.id !== id));
-  };
+  const addGoal = (g) => { setGoals(prev => [...prev, { ...g, id: genId(), current: 0 }]); setModal(null); };
+  const depositGoal = (id, amt) => setGoals(prev => prev.map(g => g.id === id ? { ...g, current: Math.min(g.target, g.current + amt) } : g));
+  const delGoal = (id) => setGoals(prev => prev.filter(g => g.id !== id));
 
-  // Add Transaction
-  const handleAddTransaction = (e) => {
-    e.preventDefault();
-    const amount = parseFloat(txAmount);
-    if (!amount || amount <= 0) return;
+  const addDebt = (d) => { setDebts(prev => [...prev, { ...d, id: genId(), status: 'unpaid' }]); setModal(null); };
+  const toggleDebt = (id) => setDebts(prev => prev.map(d => d.id === id ? { ...d, status: d.status === 'paid' ? 'unpaid' : 'paid' } : d));
+  const delDebt = (id) => setDebts(prev => prev.filter(d => d.id !== id));
 
-    // Create tx
-    const newTx = {
-      id: Date.now().toString(),
-      type: txType,
-      amount,
-      category: txType === 'income' ? 'Pemasukan' : txCategory,
-      walletId: txWalletId,
-      date: txDate,
-      note: txNote
-    };
+  const addInvest = (i) => { setInvestments(prev => [...prev, { ...i, id: genId() }]); setModal(null); };
+  const delInvest = (id) => setInvestments(prev => prev.filter(i => i.id !== id));
 
-    // Update wallet balance
-    setWallets(wallets.map(w => {
-      if (w.id === txWalletId) {
-        return {
-          ...w,
-          balance: txType === 'income' ? w.balance + amount : w.balance - amount
-        };
-      }
-      return w;
-    }));
-
-    setTransactions([newTx, ...transactions]);
-    setShowTxModal(false);
-    // Reset Form
-    setTxAmount('');
-    setTxNote('');
-  };
-
-  // Delete Transaction
-  const handleDeleteTransaction = (tx) => {
-    setTransactions(transactions.filter(t => t.id !== tx.id));
-    // Restore wallet balance
-    setWallets(wallets.map(w => {
-      if (w.id === tx.walletId) {
-        return {
-          ...w,
-          balance: tx.type === 'income' ? w.balance - tx.amount : w.balance + tx.amount
-        };
-      }
-      return w;
-    }));
-  };
-
-  // Set Budget Limit
-  const handleSetBudget = (e) => {
-    e.preventDefault();
-    const cat = e.target.budgetCategory.value;
-    const limit = parseFloat(e.target.budgetLimit.value);
-    if (!limit || limit <= 0) return;
-
-    const exists = budgets.find(b => b.category === cat);
-    if (exists) {
-      setBudgets(budgets.map(b => b.category === cat ? { ...b, limit } : b));
-    } else {
-      setBudgets([...budgets, { category: cat, limit }]);
-    }
-    e.target.reset();
-  };
-
-  // Delete Budget
-  const handleDeleteBudget = (catName) => {
-    setBudgets(budgets.filter(b => b.category !== catName));
-  };
-
-  // Add Goal
-  const handleAddGoal = (e) => {
-    e.preventDefault();
-    const name = e.target.goalName.value;
-    const target = parseFloat(e.target.goalTarget.value) || 0;
-    const deadline = e.target.goalDeadline.value;
-    if (!name || target <= 0) return;
-
-    setGoals([...goals, {
-      id: Date.now().toString(),
-      name,
-      target,
-      current: 0,
-      deadline
-    }]);
-    e.target.reset();
-  };
-
-  // Deposit to Goal
-  const handleDepositGoal = (goalId, amount) => {
-    if (!amount || amount <= 0) return;
-    setGoals(goals.map(g => {
-      if (g.id === goalId) {
-        return { ...g, current: Math.min(g.target, g.current + amount) };
-      }
-      return g;
-    }));
-  };
-
-  // Delete Goal
-  const handleDeleteGoal = (id) => {
-    setGoals(goals.filter(g => g.id !== id));
-  };
-
-  // Add Debt
-  const handleAddDebt = (e) => {
-    e.preventDefault();
-    const name = e.target.debtName.value;
-    const amount = parseFloat(e.target.debtAmount.value) || 0;
-    const type = e.target.debtType.value;
-    const dueDate = e.target.debtDueDate.value;
-    if (!name || amount <= 0) return;
-
-    setDebts([...debts, {
-      id: Date.now().toString(),
-      name,
-      amount,
-      type,
-      status: 'unpaid',
-      dueDate
-    }]);
-    e.target.reset();
-  };
-
-  // Mark Debt Paid
-  const handleToggleDebtStatus = (id) => {
-    setDebts(debts.map(d => {
-      if (d.id === id) {
-        return { ...d, status: d.status === 'paid' ? 'unpaid' : 'paid' };
-      }
-      return d;
-    }));
-  };
-
-  // Delete Debt
-  const handleDeleteDebt = (id) => {
-    setDebts(debts.filter(d => d.id !== id));
-  };
-
-  // Add Investment
-  const handleAddInvestment = (e) => {
-    e.preventDefault();
-    const name = e.target.investName.value;
-    const value = parseFloat(e.target.investValue.value) || 0;
-    const qty = e.target.investQty.value;
-    const type = e.target.investType.value;
-    if (!name || value <= 0) return;
-
-    setInvestments([...investments, {
-      id: Date.now().toString(),
-      name,
-      value,
-      qty,
-      type
-    }]);
-    e.target.reset();
-  };
-
-  // Delete Investment
-  const handleDeleteInvestment = (id) => {
-    setInvestments(investments.filter(i => i.id !== id));
-  };
-
-  // AI Assistant Chat Logic
-  const handleSendMessage = (e) => {
-    if (e) e.preventDefault();
+  // AI Chat
+  const sendChat = () => {
     if (!chatInput.trim()) return;
-
     const userMsg = chatInput.trim();
-    const newMessages = [...chatMessages, { role: 'user', text: userMsg }];
-    setChatMessages(newMessages);
+    const newMsgs = [...chatMsgs, { role: 'user', text: userMsg }];
+    setChatMsgs(newMsgs);
     setChatInput('');
 
-    // Generate responsive feedback based on actual financial parameters
     setTimeout(() => {
-      let aiText = '';
-      const textLower = userMsg.toLowerCase();
-
-      if (textLower.includes('analisis') || textLower.includes('keuangan') || textLower.includes('summary')) {
-        const topCategory = CATEGORIES.reduce((max, cat) => {
-          const spend = categorySpend(cat.name);
-          return spend > max.spend ? { name: cat.name, spend } : max;
-        }, { name: 'Belum ada', spend: 0 });
-
-        aiText = `Berdasarkan catatan keuanganmu:\n- Total saldo walet: ${formatCurrency(totalWalletBalance)}.\n- Pemasukan bulan ini: ${formatCurrency(monthlyIncome)}.\n- Pengeluaran bulan ini: ${formatCurrency(monthlyExpense)}.\n`;
-        if (monthlyExpense > monthlyIncome) {
-          aiText += `⚠️ *Peringatan:* Pengeluaran bulananmu melebihi pemasukan! Cobalah untuk menghemat pengeluaran.`;
-        } else {
-          aiText += `👍 *Bagus:* Saldo kas kamu positif dengan rasio tabungan yang sehat.`;
-        }
-        if (topCategory.spend > 0) {
-          aiText += `\nKategori pengeluaran tertinggi bulan ini adalah *${topCategory.name}* sebesar ${formatCurrency(topCategory.spend)}.`;
-        }
-      } else if (textLower.includes('tips') || textLower.includes('hemat')) {
-        aiText = `Berikut tips hemat instan khusus untukmu:\n1. Batasi makan di luar, alokasikan maks 20% budget.\n2. Cek anggaran bulanan secara rutin di tab 'Budget'.\n3. Lunasi hutangmu senilai ${formatCurrency(totalDebts)} untuk mengurangi beban bunga.`;
-      } else if (textLower.includes('hutang') || textLower.includes('debt')) {
-        aiText = `Kamu memiliki total tagihan hutang belum terbayar sebesar ${formatCurrency(totalDebts)}. Di sisi lain, orang lain berhutang kepadamu sebesar ${formatCurrency(totalReceivables)}. Fokuslah membayar hutang terlebih dahulu demi menjaga kredit skormu tetap baik!`;
-      } else if (textLower.includes('investasi') || textLower.includes('saham') || textLower.includes('emas')) {
-        aiText = `Portofolio investasi kamu saat ini senilai ${formatCurrency(totalInvestmentValue)} (${investments.length} aset). Sangat disarankan untuk mendiversifikasikan ke emas batangan atau reksadana pasar uang untuk menjaga likuiditas di tengah ketidakpastian pasar.`;
+      let reply = '';
+      const q = userMsg.toLowerCase();
+      if (q.includes('analisis') || q.includes('keuangan') || q.includes('summary')) {
+        const topCat = CATEGORIES.reduce((m, c) => { const s = catSpend(c.name); return s > m.s ? { n: c.name, s } : m; }, { n: '-', s: 0 });
+        reply = `📊 Analisis Keuangan Bulan Ini:\n\n💰 Total Saldo: ${fmt(totalBalance)}\n📈 Pemasukan: ${fmt(mIncome)}\n📉 Pengeluaran: ${fmt(mExpense)}\n${mExpense > mIncome ? '\n⚠️ Pengeluaranmu melebihi pemasukan bulan ini! Segera kurangi belanja non-esensial.' : '\n✅ Keuanganmu sehat! Rasio tabungan positif.'}\n${topCat.s > 0 ? `\n🔥 Kategori terboros: ${topCat.n} (${fmt(topCat.s)})` : ''}`;
+      } else if (q.includes('tips') || q.includes('hemat') || q.includes('saran')) {
+        reply = `💡 Tips Hemat untuk Kamu:\n\n1. Masak di rumah — hemat hingga 40% biaya makanan\n2. Gunakan transportasi umum 2-3x seminggu\n3. Terapkan aturan 50/30/20 (kebutuhan/keinginan/tabungan)\n4. Lunasi hutang ${fmt(totalDebt)} sebelum jatuh tempo\n5. Review budget di tab Budget setiap minggu`;
+      } else if (q.includes('hutang') || q.includes('debt') || q.includes('piutang')) {
+        reply = `🪙 Status Hutang-Piutang:\n\n❌ Hutangmu: ${fmt(totalDebt)}\n✅ Piutangmu: ${fmt(totalReceivable)}\n\n${totalDebt > totalReceivable ? 'Prioritaskan pelunasan hutang terlebih dahulu!' : 'Posisi piutangmu lebih besar dari hutang. Bagus!'}`;
+      } else if (q.includes('investasi') || q.includes('invest')) {
+        reply = `📈 Portofolio Investasi:\n\nTotal nilai: ${fmt(totalInvestment)} (${investments.length} aset)\n\nDiversifikasi ke minimal 3 jenis aset untuk mengurangi risiko. Pertimbangkan menambah reksadana pasar uang untuk likuiditas.`;
       } else {
-        aiText = `Halo! Saya memahami pesanmu. Terkait pengelolaan keuangan, pastikan total alokasi pengeluaranmu tidak melebihi 50% untuk kebutuhan pokok, 30% keinginan, dan 20% tabungan. Saldo bersihmu saat ini adalah ${formatCurrency(netWorth)}. Ada hal spesifik lain yang ingin kamu diskusikan?`;
+        reply = `Terima kasih atas pertanyaanmu! 😊\n\nSaldo bersihmu saat ini: ${fmt(totalBalance + totalInvestment - totalDebt)}\n\nGunakan tombol di bawah untuk pertanyaan spesifik, atau ketik "analisis" untuk laporan lengkap.`;
       }
-
-      setChatMessages([...newMessages, { role: 'assistant', text: aiText }]);
-    }, 800);
+      setChatMsgs(prev => [...prev, { role: 'ai', text: reply }]);
+    }, 600);
   };
 
-  const triggerPresetQuestion = (q) => {
-    setChatInput(q);
-    setTimeout(() => {
-      // Simulate click submit
-      const inputEl = document.getElementById('ai-chat-input');
-      if (inputEl) {
-        inputEl.focus();
-      }
-    }, 10);
+  /* =============================================
+     LANDING PAGE
+     ============================================= */
+  if (tab === 'landing') {
+    return (
+      <div className="landing">
+        {/* Top Logo */}
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'calc(env(safe-area-inset-top, 0px) + 12px) 20px 12px', background: 'rgba(18,18,18,0.85)', backdropFilter: 'blur(20px)' }}>
+          <div className="top-bar-logo">
+            <div className="logo-icon">B.</div>
+            <span className="logo-text">Budggt.</span>
+          </div>
+          <button className="btn btn-lime btn-sm" onClick={() => setTab('home')}>
+            Masuk <ArrowRight size={14} />
+          </button>
+        </div>
+
+        {/* Hero */}
+        <div className="landing-badge animate-in">
+          <Sparkles size={12} /> Aplikasi Keuangan #1 dengan AI
+        </div>
+
+        <h1 className="animate-in">
+          Kelola Uang Lebih <span className="accent">Pintar.</span>
+        </h1>
+
+        <p className="landing-subtitle animate-in">
+          Catat transaksi, atur anggaran, pantau tabungan & hutang, hingga konsultasi keuangan dengan AI — semuanya gratis.
+        </p>
+
+        <div className="landing-cta-group animate-in">
+          <button className="btn btn-lime" onClick={() => setTab('home')}>
+            Mulai Gratis Sekarang <ArrowRight size={18} />
+          </button>
+          <a href="#features" className="btn btn-ghost">
+            Lihat Fitur Lengkap
+          </a>
+        </div>
+
+        {/* App Mockup */}
+        <div className="landing-mockup animate-in">
+          <div className="mockup-bar">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 20, height: 20, borderRadius: 6, background: '#ccff00', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, color: '#121212' }}>B</div>
+              <span style={{ fontSize: 12, fontWeight: 600 }}>Dashboard</span>
+            </div>
+            <div className="mockup-dots">
+              <div className="mockup-dot" style={{ background: '#ef4444' }} />
+              <div className="mockup-dot" style={{ background: '#f59e0b' }} />
+              <div className="mockup-dot" style={{ background: '#10b981' }} />
+            </div>
+          </div>
+          <div className="mockup-content">
+            <div className="mockup-stat-card">
+              <div className="mockup-stat-label">Total Saldo</div>
+              <div className="mockup-stat-value text-lime">Rp 3.150.000</div>
+              <div style={{ fontSize: 10, color: '#10b981', marginTop: 4 }}>↑ 12% dari bulan lalu</div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div className="mockup-stat-card">
+                <div className="mockup-stat-label">Pemasukan</div>
+                <div className="mockup-stat-value text-success" style={{ fontSize: 14 }}>Rp 3.500.000</div>
+              </div>
+              <div className="mockup-stat-card">
+                <div className="mockup-stat-label">Pengeluaran</div>
+                <div className="mockup-stat-value text-danger" style={{ fontSize: 14 }}>Rp 455.000</div>
+              </div>
+            </div>
+            <div className="mockup-stat-card" style={{ marginTop: 8 }}>
+              <div className="mockup-stat-label">Budget Makanan</div>
+              <div style={{ height: 4, background: '#2a2a2a', borderRadius: 99, overflow: 'hidden', marginTop: 8 }}>
+                <div style={{ width: '35%', height: '100%', background: '#ccff00', borderRadius: 99 }} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Features */}
+        <div id="features" className="features-section">
+          <h2 className="features-title">Fitur Lengkap</h2>
+          <p className="features-subtitle">Semua yang kamu butuhkan untuk mengelola keuangan pribadi dalam satu aplikasi.</p>
+
+          <div className="features-grid">
+            {[
+              { icon: '💳', title: 'Multi Dompet', desc: 'Kelola kas, rekening bank, kartu kredit, dan e-wallet secara terpisah.', bg: 'rgba(179,136,255,0.1)', border: 'rgba(179,136,255,0.2)' },
+              { icon: '📊', title: 'Limit Anggaran', desc: 'Atur batas pengeluaran per kategori dan dapatkan peringatan otomatis.', bg: 'rgba(204,255,0,0.06)', border: 'rgba(204,255,0,0.15)' },
+              { icon: '🎯', title: 'Target Tabungan', desc: 'Buat rencana tabungan dengan target dan pantau progress harian.', bg: 'rgba(6,182,212,0.1)', border: 'rgba(6,182,212,0.2)' },
+              { icon: '🤖', title: 'AI Konsultan', desc: 'Tanyakan kondisi keuanganmu dan dapatkan saran hemat instan.', bg: 'rgba(179,136,255,0.1)', border: 'rgba(179,136,255,0.2)' },
+              { icon: '📒', title: 'Hutang & Piutang', desc: 'Catat siapa berhutang kepadamu dan sebaliknya dengan jatuh tempo.', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.2)' },
+              { icon: '📈', title: 'Aset & Investasi', desc: 'Lacak emas, saham, reksadana, dan crypto untuk total kekayaan bersih.', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.2)' },
+            ].map((f, i) => (
+              <div key={i} className="feature-card">
+                <div className="feature-icon" style={{ background: f.bg, border: `1px solid ${f.border}` }}>
+                  {f.icon}
+                </div>
+                <h3>{f.title}</h3>
+                <p>{f.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '32px 20px', textAlign: 'center', fontSize: 11, color: 'var(--text-tertiary)', width: '100%', borderTop: '1px solid var(--border)' }}>
+          © 2026 Budggt. Semua data tersimpan lokal di perangkatmu.
+        </div>
+      </div>
+    );
+  }
+
+  /* =============================================
+     APP SHELL
+     ============================================= */
+  return (
+    <div className="app-shell">
+      {/* Top Bar */}
+      <div className="top-bar">
+        <div className="top-bar-logo">
+          <div className="logo-icon">B.</div>
+          <span className="logo-text">Budggt.</span>
+        </div>
+        <div className="top-bar-actions">
+          <button className="icon-btn" onClick={() => setTab('home')} title="Beranda">
+            <BarChart3 size={18} />
+          </button>
+          <button className="icon-btn accent" onClick={() => setModal('tx')}>
+            <Plus size={20} />
+          </button>
+        </div>
+      </div>
+
+      {/* Page Content */}
+      <div className="page-content">
+
+        {/* ===== HOME TAB ===== */}
+        {tab === 'home' && (
+          <div className="space-y-4 animate-in">
+            {/* Balance card */}
+            <div className="balance-card">
+              <div className="balance-label">Total Saldo Bersih</div>
+              <div className="balance-amount">{fmt(totalBalance)}</div>
+              <div className="balance-sub">{wallets.length} dompet aktif • {new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}</div>
+            </div>
+
+            {/* Income / Expense stats */}
+            <div className="stat-row">
+              <div className="stat-chip">
+                <div className="stat-chip-icon income"><TrendingUp size={18} /></div>
+                <div className="stat-chip-label">Pemasukan</div>
+                <div className="stat-chip-value income">{fmt(mIncome)}</div>
+              </div>
+              <div className="stat-chip">
+                <div className="stat-chip-icon expense"><TrendingDown size={18} /></div>
+                <div className="stat-chip-label">Pengeluaran</div>
+                <div className="stat-chip-value expense">{fmt(mExpense)}</div>
+              </div>
+            </div>
+
+            {/* Budget progress */}
+            {budgets.length > 0 && (
+              <div>
+                <div className="section-header">
+                  <h2 className="section-title">Anggaran Bulan Ini</h2>
+                  <button className="section-action" onClick={() => setTab('budgets')}>
+                    Semua <ChevronRight size={14} />
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  {budgets.slice(0, 3).map(b => {
+                    const spent = catSpend(b.category);
+                    const pct = Math.min(100, Math.round((spent / b.limit) * 100));
+                    const over = spent > b.limit;
+                    return (
+                      <div key={b.category} className="budget-item">
+                        <div className="budget-header">
+                          <span className="budget-name">{b.category}</span>
+                          <span className="budget-values">{fmt(spent)} / {fmt(b.limit)}</span>
+                        </div>
+                        <div className="progress-track">
+                          <div className={`progress-fill ${over ? 'over' : pct > 85 ? 'warn' : 'safe'}`} style={{ width: `${pct}%` }} />
+                        </div>
+                        {over && <div className="budget-alert"><AlertTriangle size={12} /> Melebihi batas!</div>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Recent transactions */}
+            <div>
+              <div className="section-header">
+                <h2 className="section-title">Transaksi Terakhir</h2>
+                <button className="section-action" onClick={() => setTab('wallets')}>
+                  Semua <ChevronRight size={14} />
+                </button>
+              </div>
+              <div className="card tx-list">
+                {txns.slice(0, 5).map(t => {
+                  const w = wallets.find(w => w.id === t.walletId);
+                  const cat = CATEGORIES.find(c => c.name === t.category);
+                  return (
+                    <div key={t.id} className="tx-item">
+                      <div className="tx-icon">{t.type === 'income' ? '💰' : (cat?.icon || '🏷️')}</div>
+                      <div className="tx-info">
+                        <div className="tx-info-title">{t.note || t.category}</div>
+                        <div className="tx-info-sub">{t.date} • {w?.name || 'Dompet'}</div>
+                      </div>
+                      <div className={`tx-amount ${t.type}`}>
+                        {t.type === 'income' ? '+' : '-'}{fmt(t.amount)}
+                      </div>
+                    </div>
+                  );
+                })}
+                {txns.length === 0 && <div className="empty-state"><BookOpen size={32} /><span>Belum ada transaksi</span></div>}
+              </div>
+            </div>
+
+            {/* Quick Links */}
+            <div className="grid-2">
+              <button className="card card-sm card-interactive flex items-center gap-3" onClick={() => setTab('goals')}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(179,136,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Target size={18} style={{ color: '#b388ff' }} />
+                </div>
+                <div style={{ textAlign: 'left' }}>
+                  <div className="text-sm font-bold">Tabungan</div>
+                  <div className="text-xs text-dim">{goals.length} target aktif</div>
+                </div>
+              </button>
+              <button className="card card-sm card-interactive flex items-center gap-3" onClick={() => setModal('debt')}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(245,158,11,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Coins size={18} style={{ color: '#f59e0b' }} />
+                </div>
+                <div style={{ textAlign: 'left' }}>
+                  <div className="text-sm font-bold">Hutang</div>
+                  <div className="text-xs text-dim">{debts.filter(d => d.status === 'unpaid').length} belum lunas</div>
+                </div>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ===== WALLETS TAB ===== */}
+        {tab === 'wallets' && (
+          <div className="space-y-4 animate-in">
+            <div className="section-header">
+              <h2 className="section-title">Dompet Saya</h2>
+              <button className="btn btn-lime btn-sm" onClick={() => setModal('wallet')}>
+                <Plus size={14} /> Tambah
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {wallets.map(w => (
+                <div key={w.id} className="wallet-card">
+                  <div className="wallet-emoji">{w.emoji}</div>
+                  <div className="wallet-info">
+                    <div className="wallet-name">{w.name}</div>
+                    <div className="wallet-type">{w.type}</div>
+                  </div>
+                  <div className="wallet-balance">{fmt(w.balance)}</div>
+                  <button className="delete-btn" onClick={() => delWallet(w.id)}><Trash2 size={14} /></button>
+                </div>
+              ))}
+            </div>
+
+            {/* All transactions */}
+            <div className="section-header mt-4">
+              <h2 className="section-title">Semua Transaksi</h2>
+            </div>
+            <div className="card tx-list">
+              {txns.map(t => {
+                const w = wallets.find(w => w.id === t.walletId);
+                const cat = CATEGORIES.find(c => c.name === t.category);
+                return (
+                  <div key={t.id} className="tx-item">
+                    <div className="tx-icon">{t.type === 'income' ? '💰' : (cat?.icon || '🏷️')}</div>
+                    <div className="tx-info">
+                      <div className="tx-info-title">{t.note || t.category}</div>
+                      <div className="tx-info-sub">{t.date} • {w?.name || 'Dompet'}</div>
+                    </div>
+                    <div className={`tx-amount ${t.type}`}>
+                      {t.type === 'income' ? '+' : '-'}{fmt(t.amount)}
+                    </div>
+                    <button className="delete-btn" onClick={() => delTx(t)}><Trash2 size={14} /></button>
+                  </div>
+                );
+              })}
+              {txns.length === 0 && <div className="empty-state"><BookOpen size={32} /><span>Belum ada transaksi</span></div>}
+            </div>
+
+            {/* Debts & Investments */}
+            <div className="section-header mt-4">
+              <h2 className="section-title">Hutang & Piutang</h2>
+              <button className="btn btn-ghost btn-sm" onClick={() => setModal('debt')}><Plus size={14} /> Catat</button>
+            </div>
+            <div className="space-y-3">
+              {debts.map(d => (
+                <div key={d.id} className="debt-item">
+                  <div className="debt-info">
+                    <div className="debt-name">
+                      {d.name}
+                      <span className={`badge ${d.type === 'debt' ? 'badge-debt' : 'badge-receivable'}`}>
+                        {d.type === 'debt' ? 'Hutang' : 'Piutang'}
+                      </span>
+                      <span className={`badge ${d.status === 'paid' ? 'badge-paid' : 'badge-unpaid'}`}>
+                        {d.status === 'paid' ? 'Lunas' : 'Belum'}
+                      </span>
+                    </div>
+                    <div className="debt-due">Jatuh tempo: {d.dueDate}</div>
+                  </div>
+                  <div className={`debt-amount ${d.status === 'paid' ? 'line-through text-dim' : d.type === 'debt' ? 'text-danger' : 'text-success'}`}>
+                    {fmt(d.amount)}
+                  </div>
+                  <button className="btn btn-ghost btn-sm" onClick={() => toggleDebt(d.id)}>
+                    {d.status === 'paid' ? 'Buka' : '✓'}
+                  </button>
+                  <button className="delete-btn" onClick={() => delDebt(d.id)}><Trash2 size={14} /></button>
+                </div>
+              ))}
+              {debts.length === 0 && <div className="empty-state"><Coins size={28} /><span>Belum ada catatan</span></div>}
+            </div>
+
+            {/* Investments */}
+            <div className="section-header mt-4">
+              <h2 className="section-title">Aset & Investasi</h2>
+              <button className="btn btn-ghost btn-sm" onClick={() => setModal('invest')}><Plus size={14} /> Tambah</button>
+            </div>
+
+            {investments.length > 0 && (
+              <div className="summary-banner mb-3">
+                <div>
+                  <div className="label">Total Investasi</div>
+                  <div className="value">{fmt(totalInvestment)}</div>
+                </div>
+                <TrendingUp size={28} style={{ color: 'var(--zlime)', opacity: 0.6 }} />
+              </div>
+            )}
+
+            <div className="space-y-3">
+              {investments.map(i => (
+                <div key={i.id} className="invest-card">
+                  <div className="invest-info">
+                    <div className="invest-name">{i.name}</div>
+                    <div className="invest-meta">{i.type} • {i.qty || '-'}</div>
+                  </div>
+                  <div className="invest-value">{fmt(i.value)}</div>
+                  <button className="delete-btn" onClick={() => delInvest(i.id)}><Trash2 size={14} /></button>
+                </div>
+              ))}
+              {investments.length === 0 && <div className="empty-state"><TrendingUp size={28} /><span>Belum ada aset</span></div>}
+            </div>
+          </div>
+        )}
+
+        {/* ===== BUDGETS TAB ===== */}
+        {tab === 'budgets' && (
+          <div className="space-y-4 animate-in">
+            <div className="section-header">
+              <h2 className="section-title">Anggaran Kategori</h2>
+              <button className="btn btn-lime btn-sm" onClick={() => setModal('budget')}>
+                <Plus size={14} /> Atur
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {budgets.map(b => {
+                const spent = catSpend(b.category);
+                const pct = Math.min(100, Math.round((spent / b.limit) * 100));
+                const over = spent > b.limit;
+                const catInfo = CATEGORIES.find(c => c.name === b.category);
+                return (
+                  <div key={b.category} className="budget-item">
+                    <div className="budget-header">
+                      <span className="budget-name">{catInfo?.icon} {b.category}</span>
+                      <button className="delete-btn" onClick={() => delBudget(b.category)}><Trash2 size={13} /></button>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 8 }}>
+                      <span className="font-semibold">{fmt(spent)}</span>
+                      <span className="text-dim">dari {fmt(b.limit)} ({pct}%)</span>
+                    </div>
+                    <div className="progress-track">
+                      <div className={`progress-fill ${over ? 'over' : pct > 85 ? 'warn' : 'safe'}`} style={{ width: `${pct}%` }} />
+                    </div>
+                    {over && <div className="budget-alert"><AlertTriangle size={12} /> Melebihi batas anggaran!</div>}
+                  </div>
+                );
+              })}
+              {budgets.length === 0 && <div className="empty-state"><PieChart size={32} /><span>Belum ada anggaran diatur</span></div>}
+            </div>
+          </div>
+        )}
+
+        {/* ===== GOALS TAB ===== */}
+        {tab === 'goals' && (
+          <div className="space-y-4 animate-in">
+            <div className="section-header">
+              <h2 className="section-title">Target Tabungan</h2>
+              <button className="btn btn-lime btn-sm" onClick={() => setModal('goal')}>
+                <Plus size={14} /> Baru
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {goals.map(g => {
+                const pct = Math.min(100, Math.round((g.current / g.target) * 100));
+                return (
+                  <div key={g.id} className="goal-card">
+                    <div className="flex items-center justify-between">
+                      <div className="goal-name">{g.name}</div>
+                      <button className="delete-btn" onClick={() => delGoal(g.id)}><Trash2 size={14} /></button>
+                    </div>
+                    <div className="goal-meta">Tenggat: {g.deadline || 'Tidak ada'}</div>
+                    <div className="goal-progress-text">
+                      <span className="current">{fmt(g.current)}</span>
+                      <span className="target">{fmt(g.target)} ({pct}%)</span>
+                    </div>
+                    <div className="progress-track" style={{ height: 8 }}>
+                      <div className="progress-fill" style={{ width: `${pct}%`, background: 'var(--zpurple)' }} />
+                    </div>
+                    <button
+                      className="btn btn-ghost btn-sm btn-full mt-3"
+                      onClick={() => {
+                        const a = parseFloat(prompt('Masukkan jumlah setoran (IDR):'));
+                        if (a > 0) depositGoal(g.id, a);
+                      }}
+                    >
+                      + Tambah Dana
+                    </button>
+                  </div>
+                );
+              })}
+              {goals.length === 0 && <div className="empty-state"><Target size={32} /><span>Belum ada target tabungan</span></div>}
+            </div>
+          </div>
+        )}
+
+        {/* ===== AI TAB ===== */}
+        {tab === 'ai' && (
+          <div className="animate-in">
+            <div className="chat-container">
+              <div className="chat-header">
+                <div className="chat-header-left">
+                  <div className="chat-dot" />
+                  <span className="text-sm font-bold">Budggt AI</span>
+                </div>
+                <button
+                  className="text-xs text-muted"
+                  onClick={() => setChatMsgs([{ role: 'ai', text: 'Obrolan direset! Tanyakan apa saja tentang keuanganmu 😊' }])}
+                >
+                  Reset
+                </button>
+              </div>
+
+              <div className="chat-quick-actions">
+                {[
+                  { icon: '📊', text: 'Analisis Keuangan' },
+                  { icon: '💡', text: 'Tips Hemat' },
+                  { icon: '🪙', text: 'Status Hutang' },
+                  { icon: '📈', text: 'Portofolio Investasi' },
+                ].map((q, i) => (
+                  <button key={i} className="quick-action-btn" onClick={() => { setChatInput(q.text); }}>
+                    {q.icon} {q.text}
+                  </button>
+                ))}
+              </div>
+
+              <div className="chat-messages">
+                {chatMsgs.map((m, i) => (
+                  <div key={i} className={`chat-bubble ${m.role === 'ai' ? 'ai' : 'user'}`}>
+                    {m.text}
+                  </div>
+                ))}
+                <div ref={chatEndRef} />
+              </div>
+
+              <form className="chat-input-bar" onSubmit={e => { e.preventDefault(); sendChat(); }}>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Tanya soal keuanganmu..."
+                  value={chatInput}
+                  onChange={e => setChatInput(e.target.value)}
+                  style={{ flex: 1 }}
+                />
+                <button type="submit" className="btn btn-lime btn-sm" style={{ background: 'var(--zpurple)' }}>
+                  Kirim
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* FAB */}
+      <button className="fab" onClick={() => setModal('tx')} aria-label="Tambah Transaksi">
+        <Plus size={26} />
+      </button>
+
+      {/* Bottom Tab Bar */}
+      <nav className="tab-bar">
+        {TABS.map(t => (
+          <button key={t.id} className={`tab-item ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>
+            <t.Icon size={22} />
+            <span>{t.label}</span>
+          </button>
+        ))}
+      </nav>
+
+      {/* ===== MODALS / BOTTOM SHEETS ===== */}
+
+      {/* Transaction Modal */}
+      {modal === 'tx' && (
+        <BottomSheet title="Catat Transaksi" onClose={() => setModal(null)}>
+          <TxForm wallets={wallets} onSubmit={addTx} />
+        </BottomSheet>
+      )}
+
+      {/* Wallet Modal */}
+      {modal === 'wallet' && (
+        <BottomSheet title="Tambah Dompet" onClose={() => setModal(null)}>
+          <WalletForm onSubmit={addWallet} />
+        </BottomSheet>
+      )}
+
+      {/* Budget Modal */}
+      {modal === 'budget' && (
+        <BottomSheet title="Atur Anggaran" onClose={() => setModal(null)}>
+          <BudgetForm onSubmit={addBudget} />
+        </BottomSheet>
+      )}
+
+      {/* Goal Modal */}
+      {modal === 'goal' && (
+        <BottomSheet title="Target Tabungan Baru" onClose={() => setModal(null)}>
+          <GoalForm onSubmit={addGoal} />
+        </BottomSheet>
+      )}
+
+      {/* Debt Modal */}
+      {modal === 'debt' && (
+        <BottomSheet title="Catat Hutang / Piutang" onClose={() => setModal(null)}>
+          <DebtForm onSubmit={addDebt} />
+        </BottomSheet>
+      )}
+
+      {/* Investment Modal */}
+      {modal === 'invest' && (
+        <BottomSheet title="Tambah Aset" onClose={() => setModal(null)}>
+          <InvestForm onSubmit={addInvest} />
+        </BottomSheet>
+      )}
+    </div>
+  );
+}
+
+/* =============================================
+   REUSABLE COMPONENTS
+   ============================================= */
+
+function BottomSheet({ title, onClose, children }) {
+  return (
+    <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal-sheet">
+        <div className="modal-handle" />
+        <div className="modal-header">
+          <h2 className="modal-title">{title}</h2>
+          <button className="modal-close" onClick={onClose}><X size={18} /></button>
+        </div>
+        <div className="modal-body">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function TxForm({ wallets, onSubmit }) {
+  const [type, setType] = useState('expense');
+  const [amount, setAmount] = useState('');
+  const [category, setCategory] = useState(CATEGORIES[0].name);
+  const [walletId, setWalletId] = useState(wallets[0]?.id || '');
+  const [date, setDate] = useState(new Date().toISOString().substring(0, 10));
+  const [note, setNote] = useState('');
+
+  const handle = (e) => {
+    e.preventDefault();
+    const a = parseFloat(amount);
+    if (!a || a <= 0) return;
+    onSubmit({ type, amount: a, category: type === 'income' ? 'Pemasukan' : category, walletId, date, note });
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* Top Navbar */}
-      <header className="glass-panel sticky top-0 z-[100] border-b border-white/5 py-4 px-6 flex items-center justify-between">
-        <div className="flex items-center gap-3 cursor-pointer" onClick={() => setCurrentTab('landing')}>
-          <div className="w-10 h-10 rounded-xl bg-lime flex items-center justify-center font-bold text-xl shadow-lg glow-lime">
-            B.
-          </div>
-          <span className="font-title font-bold text-2xl tracking-tight">Budggt.</span>
-        </div>
-
-        {/* Navigation Tabs (Dashboard & Beyond) */}
-        {currentTab !== 'landing' && (
-          <nav className="hidden md:flex items-center gap-1">
-            <button className={`nav-item ${currentTab === 'dashboard' ? 'active' : ''}`} onClick={() => setCurrentTab('dashboard')}>
-              <BarChart3 size={18} /> Dashboard
-            </button>
-            <button className={`nav-item ${currentTab === 'wallets' ? 'active' : ''}`} onClick={() => setCurrentTab('wallets')}>
-              <Wallet size={18} /> Dompet
-            </button>
-            <button className={`nav-item ${currentTab === 'transactions' ? 'active' : ''}`} onClick={() => setCurrentTab('transactions')}>
-              <CreditCard size={18} /> Transaksi
-            </button>
-            <button className={`nav-item ${currentTab === 'budgets' ? 'active' : ''}`} onClick={() => setCurrentTab('budgets')}>
-              <AlertTriangle size={18} /> Budget
-            </button>
-            <button className={`nav-item ${currentTab === 'goals' ? 'active' : ''}`} onClick={() => setCurrentTab('goals')}>
-              <Target size={18} /> Tabungan
-            </button>
-            <button className={`nav-item ${currentTab === 'debts' ? 'active' : ''}`} onClick={() => setCurrentTab('debts')}>
-              <Coins size={18} /> Hutang
-            </button>
-            <button className={`nav-item ${currentTab === 'investments' ? 'active' : ''}`} onClick={() => setCurrentTab('investments')}>
-              <TrendingUp size={18} /> Investasi
-            </button>
-            <button className={`nav-item ${currentTab === 'ai' ? 'active' : ''}`} onClick={() => setCurrentTab('ai')}>
-              <Sparkles className="text-purple-400 animate-pulse" size={18} /> AI Asisten
-            </button>
-          </nav>
-        )}
-
-        <div className="flex items-center gap-4">
-          {/* Theme Selector */}
-          <div className="flex items-center gap-1 bg-black/20 p-1 rounded-lg border border-white/5">
-            <button 
-              className={`p-1.5 rounded ${theme === 'dark' ? 'bg-zinc-800 text-lime-400' : 'text-zinc-400'}`}
-              onClick={() => setTheme('dark')}
-              title="Dark Theme"
-            >
-              <Moon size={16} />
-            </button>
-            <button 
-              className={`p-1.5 rounded ${theme === 'light' ? 'bg-zinc-200 text-zinc-950' : 'text-zinc-500'}`}
-              onClick={() => setTheme('light')}
-              title="Light Theme"
-            >
-              <Sun size={16} />
-            </button>
-            <button 
-              className={`p-1.5 rounded ${theme === 'cute' ? 'bg-[#ffb7b2] text-zinc-950' : 'text-zinc-500'}`}
-              onClick={() => setTheme('cute')}
-              title="Cute Pastel Theme"
-            >
-              <Zap size={16} />
-            </button>
-          </div>
-
-          {currentTab === 'landing' ? (
-            <button className="btn-primary" onClick={() => setCurrentTab('dashboard')}>
-              Mulai Sekarang <ArrowRight size={16} />
-            </button>
-          ) : (
-            <div className="flex items-center gap-2 bg-zinc-800/80 p-1.5 pr-3 rounded-full border border-white/10">
-              <div className="w-8 h-8 rounded-full bg-[#b388ff] text-zinc-900 flex items-center justify-center font-bold text-sm">
-                U
-              </div>
-              <span className="text-xs font-semibold hidden sm:inline">{userProfile.name}</span>
-            </div>
-          )}
-        </div>
-      </header>
-
-      {/* Main Content Area */}
-      <main className="flex-1">
-        
-        {/* ================= LANDING PAGE VIEW ================= */}
-        {currentTab === 'landing' && (
-          <div className="flex flex-col items-center">
-            {/* Hero Section */}
-            <section className="max-w-5xl mx-auto px-6 py-20 text-center flex flex-col items-center">
-              <div className="inline-flex items-center gap-2 bg-lime/10 border border-lime/30 text-lime-400 px-4 py-1.5 rounded-full text-xs font-semibold mb-8 animate-bounce">
-                <Sparkles size={14} /> Aplikasi Keuangan Pribadi #1 dengan Dukungan AI
-              </div>
-              
-              <h1 className="font-title text-5xl md:text-7xl font-bold tracking-tight mb-6 leading-tight max-w-4xl">
-                Kelola Uang Lebih <span className="color-lime">Pintar</span>, Bebas Stres Finansial.
-              </h1>
-              
-              <p className="text-lg md:text-xl text-zinc-400 max-w-2xl mb-12">
-                Budggt membantu mencatat transaksi harian, mengelola anggaran dompet, memantau tujuan tabungan, hutang, hingga memberikan rekomendasi hemat langsung dari asisten AI cerdas.
-              </p>
-
-              <div className="flex flex-col sm:flex-row gap-4 mb-16">
-                <button className="btn-primary text-lg px-8 py-4 rounded-xl" onClick={() => setCurrentTab('dashboard')}>
-                  Mulai Kelola Sekarang <ArrowRight size={20} />
-                </button>
-                <a href="#features" className="btn-secondary text-lg px-8 py-4 rounded-xl">
-                  Pelajari Fitur
-                </a>
-              </div>
-
-              {/* Interface Mockup */}
-              <div className="relative w-full max-w-4xl aspect-video rounded-2xl overflow-hidden border border-white/10 bg-zinc-900/50 p-2 shadow-2xl glow-lime">
-                <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent z-10" />
-                <div className="w-full h-full rounded-xl bg-zinc-950/80 flex flex-col p-4 text-left overflow-hidden select-none">
-                  {/* Top Bar inside Mockup */}
-                  <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-md bg-lime flex items-center justify-center text-xs font-bold text-zinc-900">B</div>
-                      <span className="font-title text-sm font-semibold">Budggt. Dashboard Mockup</span>
-                    </div>
-                    <div className="flex gap-1.5">
-                      <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
-                      <div className="w-2.5 h-2.5 rounded-full bg-yellow-500" />
-                      <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
-                    </div>
-                  </div>
-                  {/* Body inside Mockup */}
-                  <div className="grid grid-cols-3 gap-3 flex-1">
-                    <div className="bg-zinc-900 p-3 rounded-lg border border-white/5 flex flex-col justify-between">
-                      <span className="text-zinc-500 text-xs">Total Saldo</span>
-                      <span className="text-xl font-bold text-white">Rp 3.150.000</span>
-                      <span className="text-xs text-emerald-400">↑ 12% dari bulan lalu</span>
-                    </div>
-                    <div className="bg-zinc-900 p-3 rounded-lg border border-white/5 flex flex-col justify-between">
-                      <span className="text-zinc-500 text-xs">Pengeluaran Juni</span>
-                      <span className="text-xl font-bold text-red-400">Rp 205.000</span>
-                      <div className="w-full bg-zinc-800 h-1.5 rounded-full overflow-hidden">
-                        <div className="bg-red-400 h-full w-[45%]" />
-                      </div>
-                    </div>
-                    <div className="bg-zinc-900 p-3 rounded-lg border border-white/5 flex flex-col justify-between">
-                      <span className="text-zinc-500 text-xs">Tujuan Tabungan</span>
-                      <span className="text-xl font-bold text-purple-400">Rp 3.500.000</span>
-                      <span className="text-xs text-purple-400">55% Target Terpenuhi</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            {/* Features list */}
-            <section id="features" className="w-full bg-zinc-950/40 border-t border-white/5 py-24 px-6">
-              <div className="max-w-5xl mx-auto">
-                <div className="text-center mb-16">
-                  <h2 className="text-3xl md:text-4xl font-bold mb-4 font-title">
-                    Segala Kebutuhan Finansial dalam Satu Genggaman
-                  </h2>
-                  <p className="text-zinc-400 max-w-xl mx-auto">
-                    Rasakan kemudahan mengontrol pengeluaran dengan tools modern terintegrasi secara dinamis.
-                  </p>
-                </div>
-
-                <div className="grid md:grid-cols-3 gap-6">
-                  <div className="card">
-                    <div className="w-12 h-12 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center mb-4">
-                      <Wallet size={24} className="text-purple-400" />
-                    </div>
-                    <h3 className="text-lg font-bold mb-2">Multi Dompet & Rekening</h3>
-                    <p className="text-sm text-zinc-400">
-                      Pisahkan anggaran kas, rekening bank, kartu kredit, hingga e-wallet favorit kamu secara rapi.
-                    </p>
-                  </div>
-
-                  <div className="card">
-                    <div className="w-12 h-12 rounded-lg bg-lime/10 border border-lime/30 flex items-center justify-center mb-4">
-                      <BarChart3 size={24} className="color-lime" />
-                    </div>
-                    <h3 className="text-lg font-bold mb-2">Sistem Limit Budget</h3>
-                    <p className="text-sm text-zinc-400">
-                      Tentukan batas pengeluaran kategori (seperti belanja/makanan) untuk mencegah boros sebelum terlambat.
-                    </p>
-                  </div>
-
-                  <div className="card">
-                    <div className="w-12 h-12 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center mb-4">
-                      <Sparkles size={24} className="text-cyan-400 animate-pulse" />
-                    </div>
-                    <h3 className="text-lg font-bold mb-2">Asisten Keuangan AI</h3>
-                    <p className="text-sm text-zinc-400">
-                      Konsultasikan data transaksi langsung dengan AI kami untuk mendapatkan strategi berhemat.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </section>
-          </div>
-        )}
-
-        {/* ================= APP LAYOUT & TABS ================= */}
-        {currentTab !== 'landing' && (
-          <div className="max-w-6xl mx-auto px-6 py-8">
-            
-            {/* Quick Actions (Floating or Top bar) */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 bg-zinc-900/60 border border-white/5 p-4 rounded-2xl glass-panel">
-              <div>
-                <h1 className="text-2xl font-bold font-title">
-                  {currentTab === 'dashboard' && 'Dashboard Finansial'}
-                  {currentTab === 'wallets' && 'Kelola Dompet'}
-                  {currentTab === 'transactions' && 'Riwayat Transaksi'}
-                  {currentTab === 'budgets' && 'Anggaran Kategori'}
-                  {currentTab === 'goals' && 'Tujuan Tabungan'}
-                  {currentTab === 'debts' && 'Hutang & Piutang'}
-                  {currentTab === 'investments' && 'Aset & Investasi'}
-                  {currentTab === 'ai' && 'AI Konsultan Finansial'}
-                </h1>
-                <p className="text-sm text-zinc-400">
-                  {currentTab === 'dashboard' && 'Rangkuman saldo bersih, pengeluaran, dan performa keuanganmu.'}
-                  {currentTab === 'wallets' && 'Pisahkan saldo kas, tabungan, dan dompet digital.'}
-                  {currentTab === 'transactions' && 'Detail pemasukan dan pengeluaran harian.'}
-                  {currentTab === 'budgets' && 'Atur batas maksimal pengeluaran kategori bulanan.'}
-                  {currentTab === 'goals' && 'Pantau tabungan rencana dan dana darurat.'}
-                  {currentTab === 'debts' && 'Pantau catatan hutang dan piutang jatuh tempo.'}
-                  {currentTab === 'investments' && 'Catat nilai kepemilikan investasi di luar uang tunai.'}
-                  {currentTab === 'ai' && 'Tanyakan apa saja kepada AI kami berdasarkan catatan belanjamu.'}
-                </p>
-              </div>
-
-              <div className="flex gap-2">
-                <button className="btn-primary" onClick={() => setShowTxModal(true)}>
-                  <Plus size={16} /> Transaksi Baru
-                </button>
-                <button className="btn-secondary md:hidden" onClick={() => setCurrentTab('ai')}>
-                  <Sparkles size={16} className="text-purple-400" />
-                </button>
-              </div>
-            </div>
-
-            {/* Mobile Tab Bar Selector */}
-            <div className="md:hidden flex overflow-x-auto gap-2 pb-4 mb-6 scrollbar-none">
-              <button className={`nav-item whitespace-nowrap ${currentTab === 'dashboard' ? 'active' : ''}`} onClick={() => setCurrentTab('dashboard')}>
-                Dashboard
-              </button>
-              <button className={`nav-item whitespace-nowrap ${currentTab === 'wallets' ? 'active' : ''}`} onClick={() => setCurrentTab('wallets')}>
-                Dompet
-              </button>
-              <button className={`nav-item whitespace-nowrap ${currentTab === 'transactions' ? 'active' : ''}`} onClick={() => setCurrentTab('transactions')}>
-                Transaksi
-              </button>
-              <button className={`nav-item whitespace-nowrap ${currentTab === 'budgets' ? 'active' : ''}`} onClick={() => setCurrentTab('budgets')}>
-                Budget
-              </button>
-              <button className={`nav-item whitespace-nowrap ${currentTab === 'goals' ? 'active' : ''}`} onClick={() => setCurrentTab('goals')}>
-                Tabungan
-              </button>
-              <button className={`nav-item whitespace-nowrap ${currentTab === 'debts' ? 'active' : ''}`} onClick={() => setCurrentTab('debts')}>
-                Hutang
-              </button>
-              <button className={`nav-item whitespace-nowrap ${currentTab === 'investments' ? 'active' : ''}`} onClick={() => setCurrentTab('investments')}>
-                Investasi
-              </button>
-              <button className={`nav-item whitespace-nowrap ${currentTab === 'ai' ? 'active' : ''}`} onClick={() => setCurrentTab('ai')}>
-                AI
-              </button>
-            </div>
-
-            {/* TAB CONTENTS */}
-
-            {/* DASHBOARD VIEW */}
-            {currentTab === 'dashboard' && (
-              <div className="space-y-8">
-                {/* Scorecards */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className="card">
-                    <span className="text-xs text-zinc-400 block mb-1">Total Saldo Bersih</span>
-                    <span className="text-2xl font-bold font-title color-lime">{formatCurrency(netWorth)}</span>
-                    <div className="text-[10px] text-zinc-500 mt-2">
-                      Dompet + Investasi + Piutang - Hutang
-                    </div>
-                  </div>
-                  
-                  <div className="card">
-                    <span className="text-xs text-zinc-400 block mb-1">Saldo Kas Dompet</span>
-                    <span className="text-2xl font-bold font-title">{formatCurrency(totalWalletBalance)}</span>
-                    <div className="text-[10px] text-zinc-500 mt-2">
-                      Dari {wallets.length} dompet aktif
-                    </div>
-                  </div>
-
-                  <div className="card border-emerald-500/20">
-                    <span className="text-xs text-zinc-400 block mb-1">Pemasukan Bulan Ini</span>
-                    <span className="text-2xl font-bold font-title text-emerald-400 flex items-center gap-1">
-                      <TrendingUp size={20} /> {formatCurrency(monthlyIncome)}
-                    </span>
-                    <div className="text-[10px] text-zinc-500 mt-2">
-                      Total transaksi masuk
-                    </div>
-                  </div>
-
-                  <div className="card border-red-500/20">
-                    <span className="text-xs text-zinc-400 block mb-1">Pengeluaran Bulan Ini</span>
-                    <span className="text-2xl font-bold font-title text-red-400 flex items-center gap-1">
-                      <TrendingDown size={20} /> {formatCurrency(monthlyExpense)}
-                    </span>
-                    <div className="text-[10px] text-zinc-500 mt-2">
-                      Total transaksi keluar
-                    </div>
-                  </div>
-                </div>
-
-                {/* Main Dashboard Section */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  {/* Left and Middle Columns */}
-                  <div className="lg:col-span-2 space-y-6">
-                    {/* Budget progress tracker */}
-                    <div className="card">
-                      <h2 className="text-lg font-bold font-title mb-4 flex items-center justify-between">
-                        <span>Anggaran Bulan Ini</span>
-                        <button className="text-xs color-lime flex items-center gap-1" onClick={() => setCurrentTab('budgets')}>
-                          Kelola Anggaran <ChevronRight size={14} />
-                        </button>
-                      </h2>
-                      <div className="space-y-4">
-                        {budgets.length === 0 ? (
-                          <div className="text-center py-6 text-zinc-500 text-sm">
-                            Belum ada anggaran kategori diatur.
-                          </div>
-                        ) : (
-                          budgets.map(b => {
-                            const spend = categorySpend(b.category);
-                            const percent = Math.min(100, Math.round((spend / b.limit) * 100));
-                            const isOver = spend > b.limit;
-                            return (
-                              <div key={b.category} className="space-y-1.5">
-                                <div className="flex justify-between text-xs">
-                                  <span className="font-semibold">{b.category}</span>
-                                  <span className={isOver ? 'text-red-400' : 'text-zinc-400'}>
-                                    {formatCurrency(spend)} / {formatCurrency(b.limit)} ({percent}%)
-                                  </span>
-                                </div>
-                                <div className="w-full bg-zinc-800 h-2 rounded-full overflow-hidden">
-                                  <div 
-                                    className={`h-full rounded-full transition-all duration-500 ${isOver ? 'bg-red-500' : percent > 85 ? 'bg-amber-400' : 'bg-lime'}`}
-                                    style={{ width: `${percent}%` }}
-                                  />
-                                </div>
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Recent transactions */}
-                    <div className="card">
-                      <h2 className="text-lg font-bold font-title mb-4 flex items-center justify-between">
-                        <span>Transaksi Terakhir</span>
-                        <button className="text-xs color-lime flex items-center gap-1" onClick={() => setCurrentTab('transactions')}>
-                          Lihat Semua <ChevronRight size={14} />
-                        </button>
-                      </h2>
-                      
-                      <div className="divide-y divide-white/5">
-                        {transactions.slice(0, 5).map(t => {
-                          const wallet = wallets.find(w => w.id === t.walletId);
-                          return (
-                            <div key={t.id} className="py-3 flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                <div className="text-xl bg-zinc-800 w-10 h-10 rounded-lg flex items-center justify-center">
-                                  {t.type === 'income' ? '💰' : (CATEGORIES.find(c => c.name === t.category)?.icon || '🏷️')}
-                                </div>
-                                <div>
-                                  <span className="text-sm font-semibold block">{t.note || t.category}</span>
-                                  <span className="text-xs text-zinc-500">{t.date} • {wallet?.name || 'Dompet'}</span>
-                                </div>
-                              </div>
-                              <span className={`font-semibold text-sm ${t.type === 'income' ? 'text-emerald-400' : 'text-red-400'}`}>
-                                {t.type === 'income' ? '+' : '-'} {formatCurrency(t.amount)}
-                              </span>
-                            </div>
-                          );
-                        })}
-                        {transactions.length === 0 && (
-                          <div className="text-center py-6 text-zinc-500 text-sm">
-                            Belum ada catatan transaksi.
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Right Column */}
-                  <div className="space-y-6">
-                    {/* Wallets summary */}
-                    <div className="card">
-                      <h2 className="text-lg font-bold font-title mb-4 flex items-center justify-between">
-                        <span>Dompet Saya</span>
-                        <button className="text-xs color-lime flex items-center gap-1" onClick={() => setCurrentTab('wallets')}>
-                          Detail Dompet <ChevronRight size={14} />
-                        </button>
-                      </h2>
-                      <div className="space-y-3">
-                        {wallets.map(w => (
-                          <div key={w.id} className="flex items-center justify-between bg-black/20 p-3 rounded-xl border border-white/5">
-                            <div className="flex items-center gap-2.5">
-                              <span className="text-lg">{w.emoji}</span>
-                              <span className="text-sm font-semibold">{w.name}</span>
-                            </div>
-                            <span className="text-sm font-bold">{formatCurrency(w.balance)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* AI Coach Suggestion panel */}
-                    <div className="card border-purple-500/30 bg-purple-500/[0.03] flex flex-col justify-between">
-                      <div>
-                        <div className="inline-flex items-center gap-1 text-purple-400 font-bold text-xs bg-purple-500/10 border border-purple-500/20 px-2 py-1 rounded-md mb-3">
-                          <Sparkles size={12} /> AI TIPS FINANSIAL
-                        </div>
-                        <h3 className="font-title font-bold text-md mb-2">Evaluasi Pengeluaran Bulanan</h3>
-                        <p className="text-xs text-zinc-300 leading-relaxed mb-4">
-                          {monthlyExpense > monthlyIncome 
-                            ? "Waduh! Total belanja kamu bulan ini lebih besar daripada gajimu. Yuk kurangi nongkrong dan belanja non-esensial dahulu!"
-                            : "Kerja bagus! Pengeluaranmu bulan ini masih berada di bawah angka pemasukan harian. Teruskan gaya hidup sehat ini."
-                          }
-                        </p>
-                      </div>
-                      <button className="btn-secondary w-full text-xs py-2 justify-center" onClick={() => setCurrentTab('ai')}>
-                        Konsultasikan dengan AI <ArrowRight size={12} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* WALLETS VIEW */}
-            {currentTab === 'wallets' && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Add Wallet Form */}
-                <div className="card h-fit">
-                  <h2 className="text-lg font-bold font-title mb-4">Tambah Dompet Baru</h2>
-                  <form onSubmit={handleAddWallet} className="space-y-4">
-                    <div>
-                      <label className="text-xs text-zinc-400 block mb-1">Nama Dompet / Rekening</label>
-                      <input type="text" name="walletName" placeholder="Contoh: Bank Mandiri, Kas Tunai" className="form-input" required />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-xs text-zinc-400 block mb-1">Saldo Awal</label>
-                        <input type="number" name="walletBalance" placeholder="0" className="form-input" required />
-                      </div>
-                      <div>
-                        <label className="text-xs text-zinc-400 block mb-1">Jenis</label>
-                        <select name="walletType" className="form-input">
-                          <option value="cash">Cash</option>
-                          <option value="bank">Bank / Debit</option>
-                          <option value="e-wallet">E-Wallet</option>
-                          <option value="card">Kartu Kredit</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-xs text-zinc-400 block mb-1">Emoji / Icon</label>
-                      <input type="text" name="walletEmoji" placeholder="🏦" defaultValue="💳" className="form-input" maxLength="4" />
-                    </div>
-                    <button type="submit" className="btn-primary w-full justify-center">
-                      <Plus size={16} /> Buat Dompet
-                    </button>
-                  </form>
-                </div>
-
-                {/* Wallets List */}
-                <div className="lg:col-span-2 space-y-4">
-                  <h2 className="text-lg font-bold font-title">Daftar Dompet</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {wallets.map(w => (
-                      <div key={w.id} className="card flex flex-col justify-between h-36">
-                        <div className="flex justify-between items-start">
-                          <div className="flex items-center gap-3">
-                            <span className="text-3xl bg-zinc-800 p-2.5 rounded-xl">{w.emoji}</span>
-                            <div>
-                              <h3 className="font-bold text-md">{w.name}</h3>
-                              <span className="text-xs text-zinc-500 capitalize">{w.type}</span>
-                            </div>
-                          </div>
-                          <button className="text-zinc-500 hover:text-red-400 p-1" onClick={() => handleDeleteWallet(w.id)}>
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                        <div className="text-xl font-bold font-title text-right color-lime">
-                          {formatCurrency(w.balance)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* TRANSACTIONS VIEW */}
-            {currentTab === 'transactions' && (
-              <div className="card">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-                  <h2 className="text-lg font-bold font-title">Riwayat Transaksi Masuk & Keluar</h2>
-                  <div className="flex gap-2">
-                    <button className="btn-primary py-2 text-xs" onClick={() => setShowTxModal(true)}>
-                      <Plus size={14} /> Catat Transaksi
-                    </button>
-                  </div>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="border-b border-white/5 text-zinc-500 text-xs uppercase">
-                        <th className="py-3 px-4">Tanggal</th>
-                        <th className="py-3 px-4">Kategori</th>
-                        <th className="py-3 px-4">Wallet</th>
-                        <th className="py-3 px-4">Catatan</th>
-                        <th className="py-3 px-4 text-right">Jumlah</th>
-                        <th className="py-3 px-4 text-center">Aksi</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/5 text-sm">
-                      {transactions.map(t => {
-                        const wallet = wallets.find(w => w.id === t.walletId);
-                        const categoryDetails = CATEGORIES.find(c => c.name === t.category);
-                        return (
-                          <tr key={t.id} className="hover:bg-zinc-800/40">
-                            <td className="py-3.5 px-4 font-mono text-xs">{t.date}</td>
-                            <td className="py-3.5 px-4">
-                              <span className="inline-flex items-center gap-1.5 bg-zinc-800 px-2 py-0.5 rounded-full text-xs">
-                                <span>{categoryDetails?.icon || '💰'}</span>
-                                {t.category}
-                              </span>
-                            </td>
-                            <td className="py-3.5 px-4 text-zinc-300">{wallet?.name || 'Dompet'}</td>
-                            <td className="py-3.5 px-4 text-zinc-400 max-w-[200px] truncate" title={t.note}>{t.note || '-'}</td>
-                            <td className={`py-3.5 px-4 text-right font-semibold ${t.type === 'income' ? 'text-emerald-400' : 'text-red-400'}`}>
-                              {t.type === 'income' ? '+' : '-'} {formatCurrency(t.amount)}
-                            </td>
-                            <td className="py-3.5 px-4 text-center">
-                              <button className="text-zinc-500 hover:text-red-400 p-1" onClick={() => handleDeleteTransaction(t)}>
-                                <Trash2 size={15} />
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                      {transactions.length === 0 && (
-                        <tr>
-                          <td colSpan="6" className="text-center py-8 text-zinc-500">
-                            Belum ada riwayat transaksi tercatat.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {/* BUDGETS VIEW */}
-            {currentTab === 'budgets' && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Form to Set Limit */}
-                <div className="card h-fit">
-                  <h2 className="text-lg font-bold font-title mb-4">Setel Batas Anggaran</h2>
-                  <form onSubmit={handleSetBudget} className="space-y-4">
-                    <div>
-                      <label className="text-xs text-zinc-400 block mb-1">Kategori Pengeluaran</label>
-                      <select name="budgetCategory" className="form-input">
-                        {CATEGORIES.filter(c => c.name !== 'Investasi' && c.name !== 'Lainnya').map(c => (
-                          <option key={c.name} value={c.name}>{c.icon} {c.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-xs text-zinc-400 block mb-1">Batas Maksimal Bulanan (IDR)</label>
-                      <input type="number" name="budgetLimit" placeholder="Contoh: 1500000" className="form-input" required />
-                    </div>
-                    <button type="submit" className="btn-primary w-full justify-center">
-                      Simpan Anggaran
-                    </button>
-                  </form>
-                </div>
-
-                {/* Budgets Progress Bar List */}
-                <div className="lg:col-span-2 space-y-4">
-                  <h2 className="text-lg font-bold font-title">Progress Anggaran Kategori</h2>
-                  <div className="grid grid-cols-1 gap-4">
-                    {budgets.map(b => {
-                      const spend = categorySpend(b.category);
-                      const percent = Math.min(100, Math.round((spend / b.limit) * 100));
-                      const isOver = spend > b.limit;
-                      return (
-                        <div key={b.category} className="card relative overflow-hidden">
-                          <div className="flex justify-between items-start mb-3">
-                            <div>
-                              <h3 className="font-bold text-md">{b.category}</h3>
-                              <span className="text-xs text-zinc-500">Batas: {formatCurrency(b.limit)}</span>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <span className={`font-mono text-sm font-semibold ${isOver ? 'text-red-400' : 'text-zinc-300'}`}>
-                                Terpakai: {formatCurrency(spend)} ({percent}%)
-                              </span>
-                              <button className="text-zinc-500 hover:text-red-400 p-1" onClick={() => handleDeleteBudget(b.category)}>
-                                <Trash2 size={16} />
-                              </button>
-                            </div>
-                          </div>
-                          <div className="w-full bg-zinc-800 h-2.5 rounded-full overflow-hidden">
-                            <div 
-                              className={`h-full rounded-full transition-all duration-500 ${isOver ? 'bg-red-500' : percent > 85 ? 'bg-amber-400' : 'bg-lime'}`}
-                              style={{ width: `${percent}%` }}
-                            />
-                          </div>
-                          {isOver && (
-                            <div className="mt-2 text-xs text-red-400 flex items-center gap-1.5">
-                              <AlertTriangle size={14} /> Anggaran melebihi batas yang direncanakan!
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                    {budgets.length === 0 && (
-                      <div className="card text-center py-10 text-zinc-500">
-                        Belum ada batas anggaran bulanan yang ditentukan.
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* SAVINGS GOALS VIEW */}
-            {currentTab === 'goals' && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Goal Form */}
-                <div className="card h-fit">
-                  <h2 className="text-lg font-bold font-title mb-4">Buat Rencana Tabungan</h2>
-                  <form onSubmit={handleAddGoal} className="space-y-4">
-                    <div>
-                      <label className="text-xs text-zinc-400 block mb-1">Tujuan Tabungan</label>
-                      <input type="text" name="goalName" placeholder="Contoh: Dana Darurat, Beli Motor" className="form-input" required />
-                    </div>
-                    <div>
-                      <label className="text-xs text-zinc-400 block mb-1">Target Nominal (IDR)</label>
-                      <input type="number" name="goalTarget" placeholder="Contoh: 10000000" className="form-input" required />
-                    </div>
-                    <div>
-                      <label className="text-xs text-zinc-400 block mb-1">Target Tanggal</label>
-                      <input type="date" name="goalDeadline" className="form-input" />
-                    </div>
-                    <button type="submit" className="btn-primary w-full justify-center">
-                      Buat Target
-                    </button>
-                  </form>
-                </div>
-
-                {/* Goals Tracker */}
-                <div className="lg:col-span-2 space-y-4">
-                  <h2 className="text-lg font-bold font-title">Progress Target Tabungan</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {goals.map(g => {
-                      const percent = Math.min(100, Math.round((g.current / g.target) * 100));
-                      return (
-                        <div key={g.id} className="card flex flex-col justify-between min-h-[160px]">
-                          <div>
-                            <div className="flex justify-between items-start mb-2">
-                              <h3 className="font-bold text-md">{g.name}</h3>
-                              <button className="text-zinc-500 hover:text-red-400 p-1" onClick={() => handleDeleteGoal(g.id)}>
-                                <Trash2 size={16} />
-                              </button>
-                            </div>
-                            <span className="text-xs text-zinc-500 block mb-1">Tenggat waktu: {g.deadline || 'Tidak ada'}</span>
-                            <div className="text-sm font-semibold mb-2 text-purple-400">
-                              {formatCurrency(g.current)} / {formatCurrency(g.target)} ({percent}%)
-                            </div>
-                            <div className="w-full bg-zinc-800 h-2 rounded-full overflow-hidden mb-4">
-                              <div className="h-full bg-purple-500 rounded-full" style={{ width: `${percent}%` }} />
-                            </div>
-                          </div>
-
-                          <div className="flex gap-2">
-                            <button 
-                              className="btn-secondary py-1 px-3 text-xs w-full justify-center"
-                              onClick={() => {
-                                const amt = parseFloat(prompt('Masukkan jumlah simpanan (IDR):'));
-                                if (amt) handleDepositGoal(g.id, amt);
-                              }}
-                            >
-                              + Tambah Dana
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                    {goals.length === 0 && (
-                      <div className="lg:col-span-2 card text-center py-10 text-zinc-500">
-                        Belum ada target tabungan terencana.
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* DEBTS VIEW */}
-            {currentTab === 'debts' && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Form to Add Debt */}
-                <div className="card h-fit">
-                  <h2 className="text-lg font-bold font-title mb-4">Catat Hutang / Piutang</h2>
-                  <form onSubmit={handleAddDebt} className="space-y-4">
-                    <div>
-                      <label className="text-xs text-zinc-400 block mb-1">Nama Kontak / Keperluan</label>
-                      <input type="text" name="debtName" placeholder="Contoh: Budi (Pinjam Uang), Tagihan Listrik" className="form-input" required />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-xs text-zinc-400 block mb-1">Nominal (IDR)</label>
-                        <input type="number" name="debtAmount" placeholder="0" className="form-input" required />
-                      </div>
-                      <div>
-                        <label className="text-xs text-zinc-400 block mb-1">Jenis</label>
-                        <select name="debtType" className="form-input">
-                          <option value="debt">Hutang (Saya Berhutang)</option>
-                          <option value="receivable">Piutang (Orang Lain Berhutang)</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-xs text-zinc-400 block mb-1">Tanggal Jatuh Tempo</label>
-                      <input type="date" name="debtDueDate" className="form-input" required />
-                    </div>
-                    <button type="submit" className="btn-primary w-full justify-center">
-                      Simpan Catatan
-                    </button>
-                  </form>
-                </div>
-
-                {/* Debt Ledger */}
-                <div className="lg:col-span-2 space-y-6">
-                  {/* Summary Debt */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="card border-red-500/20 bg-red-500/[0.02]">
-                      <span className="text-xs text-zinc-400 block mb-1">Hutang Belum Terbayar (You Owe)</span>
-                      <span className="text-xl font-bold text-red-400">{formatCurrency(totalDebts)}</span>
-                    </div>
-                    <div className="card border-emerald-500/20 bg-emerald-500/[0.02]">
-                      <span className="text-xs text-zinc-400 block mb-1">Piutang Belum Diterima (Owed to You)</span>
-                      <span className="text-xl font-bold text-emerald-400">{formatCurrency(totalReceivables)}</span>
-                    </div>
-                  </div>
-
-                  {/* List of Debts */}
-                  <div className="card">
-                    <h3 className="text-md font-bold mb-4 font-title">Buku Hutang Piutang</h3>
-                    <div className="divide-y divide-white/5">
-                      {debts.map(d => (
-                        <div key={d.id} className="py-3 flex items-center justify-between">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold text-sm">{d.name}</span>
-                              <span className={`badge ${d.type === 'debt' ? 'bg-red-500/10 text-red-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
-                                {d.type === 'debt' ? 'Hutang' : 'Piutang'}
-                              </span>
-                              <span className={`badge ${d.status === 'paid' ? 'bg-zinc-700 text-zinc-400' : 'bg-amber-500/10 text-amber-400'}`}>
-                                {d.status === 'paid' ? 'Lunas' : 'Belum Lunas'}
-                              </span>
-                            </div>
-                            <span className="text-xs text-zinc-500">Jatuh Tempo: {d.dueDate}</span>
-                          </div>
-
-                          <div className="flex items-center gap-3">
-                            <span className={`font-semibold text-sm ${d.status === 'paid' ? 'line-through text-zinc-500' : d.type === 'debt' ? 'text-red-400' : 'text-emerald-400'}`}>
-                              {formatCurrency(d.amount)}
-                            </span>
-                            <button 
-                              onClick={() => handleToggleDebtStatus(d.id)}
-                              className="text-xs bg-zinc-800 hover:bg-zinc-700 py-1 px-2.5 rounded border border-white/5"
-                            >
-                              {d.status === 'paid' ? 'Belum' : 'Lunas'}
-                            </button>
-                            <button className="text-zinc-500 hover:text-red-400 p-1" onClick={() => handleDeleteDebt(d.id)}>
-                              <Trash2 size={15} />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                      {debts.length === 0 && (
-                        <div className="text-center py-6 text-zinc-500">
-                          Buku hutang piutang masih kosong.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* INVESTMENTS VIEW */}
-            {currentTab === 'investments' && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Form to Add Asset */}
-                <div className="card h-fit">
-                  <h2 className="text-lg font-bold font-title mb-4">Catat Aset & Investasi</h2>
-                  <form onSubmit={handleAddInvestment} className="space-y-4">
-                    <div>
-                      <label className="text-xs text-zinc-400 block mb-1">Nama Aset / Investasi</label>
-                      <input type="text" name="investName" placeholder="Contoh: Emas Batangan, Saham BBCA" className="form-input" required />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-xs text-zinc-400 block mb-1">Nilai Sekarang (IDR)</label>
-                        <input type="number" name="investValue" placeholder="0" className="form-input" required />
-                      </div>
-                      <div>
-                        <label className="text-xs text-zinc-400 block mb-1">Jenis Aset</label>
-                        <select name="investType" className="form-input">
-                          <option value="commodity">Emas / Komoditas</option>
-                          <option value="mutual-fund">Reksadana</option>
-                          <option value="stock">Saham</option>
-                          <option value="crypto">Cryptocurrency</option>
-                          <option value="other">Lainnya</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-xs text-zinc-400 block mb-1">Kuantitas / Jumlah Kepemilikan (Opsional)</label>
-                      <input type="text" name="investQty" placeholder="Contoh: 5 Gram, 10 Lot" className="form-input" />
-                    </div>
-                    <button type="submit" className="btn-primary w-full justify-center">
-                      Simpan Aset
-                    </button>
-                  </form>
-                </div>
-
-                {/* Asset Portfolio */}
-                <div className="lg:col-span-2 space-y-4">
-                  <div className="card bg-lime/5 border border-lime/20 flex items-center justify-between">
-                    <div>
-                      <span className="text-xs text-zinc-400">Total Nilai Investasi</span>
-                      <h2 className="text-2xl font-bold font-title color-lime">{formatCurrency(totalInvestmentValue)}</h2>
-                    </div>
-                    <TrendingUp size={32} className="color-lime opacity-80" />
-                  </div>
-
-                  <h2 className="text-lg font-bold font-title">Portofolio Aset Aktif</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {investments.map(i => (
-                      <div key={i.id} className="card flex flex-col justify-between h-32">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <span className="badge bg-zinc-800 text-zinc-400 capitalize mb-1">{i.type}</span>
-                            <h3 className="font-bold text-md">{i.name}</h3>
-                            <span className="text-xs text-zinc-500">{i.qty || 'Jumlah tidak diatur'}</span>
-                          </div>
-                          <button className="text-zinc-500 hover:text-red-400 p-1" onClick={() => handleDeleteInvestment(i.id)}>
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                        <div className="text-lg font-bold text-right text-zinc-200">
-                          {formatCurrency(i.value)}
-                        </div>
-                      </div>
-                    ))}
-                    {investments.length === 0 && (
-                      <div className="col-span-2 card text-center py-10 text-zinc-500">
-                        Belum ada aset investasi terdaftar.
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* AI ASSISTANT VIEW */}
-            {currentTab === 'ai' && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 max-h-[70vh]">
-                {/* Quick Info Sidebar */}
-                <div className="card h-fit space-y-4 lg:col-span-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Sparkles className="text-purple-400" size={20} />
-                    <h3 className="font-title font-bold text-md">AI Konsultan Keuangan</h3>
-                  </div>
-                  <p className="text-xs text-zinc-400 leading-relaxed">
-                    AI kami mengevaluasi seluruh transaksi, dompet aktif, tabungan, dan anggaran bulananmu untuk menghasilkan analisis yang disesuaikan secara dinamis.
-                  </p>
-                  
-                  <div className="space-y-2">
-                    <span className="text-[10px] text-zinc-500 uppercase block font-semibold">Tombol Cepat Pertanyaan</span>
-                    <button 
-                      className="btn-secondary w-full text-left py-2 px-3 text-xs justify-start gap-2"
-                      onClick={() => triggerPresetQuestion('Bagaimana analisis kondisi keuanganku saat ini?')}
-                    >
-                      💡 Analisis Keuangan Saya
-                    </button>
-                    <button 
-                      className="btn-secondary w-full text-left py-2 px-3 text-xs justify-start gap-2"
-                      onClick={() => triggerPresetQuestion('Tolong berikan tips hemat harian.')}
-                    >
-                      💸 Tips Hemat Instan
-                    </button>
-                    <button 
-                      className="btn-secondary w-full text-left py-2 px-3 text-xs justify-start gap-2"
-                      onClick={() => triggerPresetQuestion('Bagaimana status hutang piutangku?')}
-                    >
-                      🪙 Rekap Hutang Saya
-                    </button>
-                  </div>
-                </div>
-
-                {/* Chat Panel */}
-                <div className="lg:col-span-2 card flex flex-col h-[500px] p-0 overflow-hidden relative">
-                  {/* Chat header */}
-                  <div className="border-b border-white/5 py-4 px-5 flex items-center justify-between bg-black/25">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 bg-purple-500 rounded-full animate-pulse" />
-                      <span className="text-sm font-semibold">Budggt.AI Chatbot</span>
-                    </div>
-                    <button 
-                      className="text-xs text-zinc-400 hover:text-zinc-200"
-                      onClick={() => setChatMessages([{ role: 'assistant', text: 'Halo! Saya AI Konsultan Finansial Budggt. Siap membantu!' }])}
-                    >
-                      Reset Obrolan
-                    </button>
-                  </div>
-
-                  {/* Chat logs */}
-                  <div className="flex-1 overflow-y-auto p-5 space-y-4">
-                    {chatMessages.map((msg, index) => (
-                      <div key={index} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[80%] rounded-2xl py-3 px-4 text-sm leading-relaxed whitespace-pre-line ${
-                          msg.role === 'user' 
-                            ? 'bg-purple text-[#121212] font-semibold' 
-                            : 'bg-zinc-800 text-zinc-200 border border-white/5'
-                        }`}>
-                          {msg.text}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Message Input form */}
-                  <form onSubmit={handleSendMessage} className="border-t border-white/5 p-4 flex gap-2 bg-black/10">
-                    <input 
-                      type="text" 
-                      id="ai-chat-input"
-                      value={chatInput}
-                      onChange={(e) => setChatInput(e.target.value)}
-                      placeholder="Ketik pertanyaan keuanganmu..." 
-                      className="form-input flex-1"
-                    />
-                    <button type="submit" className="btn-primary py-2.5 bg-[#b388ff] text-[#121212]">
-                      Kirim
-                    </button>
-                  </form>
-                </div>
-              </div>
-            )}
-            
-          </div>
-        )}
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t border-white/5 py-8 px-6 text-center text-xs text-zinc-500">
-        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
-          <span className="font-title font-semibold text-sm">Budggt.</span>
-          <span>© 2026 Budggt Financial Planner. Semua data disimpan secara lokal di browsermu.</span>
-        </div>
-      </footer>
-
-      {/* TRANSACTION MODAL */}
-      {showTxModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
-          <div className="card w-full max-w-md bg-zinc-900 border border-white/10 relative p-6">
-            <button className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-200 p-1" onClick={() => setShowTxModal(false)}>
-              <X size={20} />
-            </button>
-
-            <h2 className="text-xl font-bold font-title mb-6">Catat Transaksi</h2>
-
-            <form onSubmit={handleAddTransaction} className="space-y-4">
-              {/* Type Switcher */}
-              <div className="grid grid-cols-2 gap-2 bg-black/45 p-1 rounded-lg border border-white/5">
-                <button 
-                  type="button"
-                  className={`py-1.5 text-xs font-semibold rounded ${txType === 'expense' ? 'bg-red-500 text-white' : 'text-zinc-400'}`}
-                  onClick={() => setTxType('expense')}
-                >
-                  Pengeluaran
-                </button>
-                <button 
-                  type="button"
-                  className={`py-1.5 text-xs font-semibold rounded ${txType === 'income' ? 'bg-emerald-500 text-white' : 'text-zinc-400'}`}
-                  onClick={() => setTxType('income')}
-                >
-                  Pemasukan
-                </button>
-              </div>
-
-              {/* Amount */}
-              <div>
-                <label className="text-xs text-zinc-400 block mb-1">Nominal Rupiah (IDR)</label>
-                <input 
-                  type="number" 
-                  value={txAmount} 
-                  onChange={(e) => setTxAmount(e.target.value)} 
-                  placeholder="0" 
-                  className="form-input text-lg font-bold" 
-                  required 
-                />
-              </div>
-
-              {/* Category selector (expense only) */}
-              {txType === 'expense' && (
-                <div>
-                  <label className="text-xs text-zinc-400 block mb-1">Kategori</label>
-                  <select 
-                    value={txCategory} 
-                    onChange={(e) => setTxCategory(e.target.value)} 
-                    className="form-input"
-                  >
-                    {CATEGORIES.map(c => (
-                      <option key={c.name} value={c.name}>{c.icon} {c.name}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Wallet select */}
-              <div>
-                <label className="text-xs text-zinc-400 block mb-1">Sumber Rekening / Dompet</label>
-                <select 
-                  value={txWalletId} 
-                  onChange={(e) => setTxWalletId(e.target.value)} 
-                  className="form-input"
-                >
-                  {wallets.map(w => (
-                    <option key={w.id} value={w.id}>{w.emoji} {w.name} ({formatCurrency(w.balance)})</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Date */}
-              <div>
-                <label className="text-xs text-zinc-400 block mb-1">Tanggal</label>
-                <input 
-                  type="date" 
-                  value={txDate} 
-                  onChange={(e) => setTxDate(e.target.value)} 
-                  className="form-input" 
-                  required 
-                />
-              </div>
-
-              {/* Note */}
-              <div>
-                <label className="text-xs text-zinc-400 block mb-1">Catatan / Keterangan</label>
-                <input 
-                  type="text" 
-                  value={txNote} 
-                  onChange={(e) => setTxNote(e.target.value)} 
-                  placeholder="Contoh: Makan Siang Bakso" 
-                  className="form-input" 
-                />
-              </div>
-
-              <button type="submit" className="btn-primary w-full justify-center py-3 mt-4 text-md">
-                Simpan Transaksi
-              </button>
-            </form>
-          </div>
+    <form onSubmit={handle} className="space-y-4">
+      <div className="type-toggle">
+        <button type="button" className={`type-toggle-btn ${type === 'expense' ? 'active-expense' : ''}`} onClick={() => setType('expense')}>Pengeluaran</button>
+        <button type="button" className={`type-toggle-btn ${type === 'income' ? 'active-income' : ''}`} onClick={() => setType('income')}>Pemasukan</button>
+      </div>
+      <div className="form-group">
+        <label className="form-label">Nominal (IDR)</label>
+        <input type="number" className="form-input" placeholder="0" value={amount} onChange={e => setAmount(e.target.value)} required style={{ fontSize: 20, fontWeight: 700 }} />
+      </div>
+      {type === 'expense' && (
+        <div className="form-group">
+          <label className="form-label">Kategori</label>
+          <select className="form-input" value={category} onChange={e => setCategory(e.target.value)}>
+            {CATEGORIES.map(c => <option key={c.name} value={c.name}>{c.icon} {c.name}</option>)}
+          </select>
         </div>
       )}
-    </div>
+      <div className="form-group">
+        <label className="form-label">Dompet</label>
+        <select className="form-input" value={walletId} onChange={e => setWalletId(e.target.value)}>
+          {wallets.map(w => <option key={w.id} value={w.id}>{w.emoji} {w.name}</option>)}
+        </select>
+      </div>
+      <div className="form-group">
+        <label className="form-label">Tanggal</label>
+        <input type="date" className="form-input" value={date} onChange={e => setDate(e.target.value)} required />
+      </div>
+      <div className="form-group">
+        <label className="form-label">Catatan</label>
+        <input type="text" className="form-input" placeholder="Makan siang, bensin, dll..." value={note} onChange={e => setNote(e.target.value)} />
+      </div>
+      <button type="submit" className="btn btn-lime btn-full" style={{ padding: '14px', marginTop: 8 }}>
+        Simpan Transaksi
+      </button>
+    </form>
+  );
+}
+
+function WalletForm({ onSubmit }) {
+  const handle = (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const name = fd.get('name');
+    const balance = parseFloat(fd.get('balance')) || 0;
+    if (!name) return;
+    onSubmit({ name, balance, type: fd.get('type'), emoji: fd.get('emoji') || '💳' });
+  };
+  return (
+    <form onSubmit={handle} className="space-y-4">
+      <div className="form-group"><label className="form-label">Nama Dompet</label><input name="name" className="form-input" placeholder="Bank BCA, GoPay, dll" required /></div>
+      <div className="grid-2">
+        <div className="form-group"><label className="form-label">Saldo Awal</label><input name="balance" type="number" className="form-input" placeholder="0" required /></div>
+        <div className="form-group"><label className="form-label">Jenis</label>
+          <select name="type" className="form-input"><option value="cash">Cash</option><option value="bank">Bank</option><option value="e-wallet">E-Wallet</option><option value="card">Kartu Kredit</option></select>
+        </div>
+      </div>
+      <div className="form-group"><label className="form-label">Emoji</label><input name="emoji" className="form-input" placeholder="🏦" defaultValue="💳" maxLength="4" /></div>
+      <button type="submit" className="btn btn-lime btn-full">Buat Dompet</button>
+    </form>
+  );
+}
+
+function BudgetForm({ onSubmit }) {
+  const handle = (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const limit = parseFloat(fd.get('limit'));
+    if (!limit || limit <= 0) return;
+    onSubmit({ category: fd.get('category'), limit });
+  };
+  return (
+    <form onSubmit={handle} className="space-y-4">
+      <div className="form-group"><label className="form-label">Kategori</label>
+        <select name="category" className="form-input">{CATEGORIES.filter(c => c.name !== 'Lainnya').map(c => <option key={c.name} value={c.name}>{c.icon} {c.name}</option>)}</select>
+      </div>
+      <div className="form-group"><label className="form-label">Batas Bulanan (IDR)</label><input name="limit" type="number" className="form-input" placeholder="1500000" required /></div>
+      <button type="submit" className="btn btn-lime btn-full">Simpan Anggaran</button>
+    </form>
+  );
+}
+
+function GoalForm({ onSubmit }) {
+  const handle = (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const target = parseFloat(fd.get('target'));
+    if (!fd.get('name') || target <= 0) return;
+    onSubmit({ name: fd.get('name'), target, deadline: fd.get('deadline') });
+  };
+  return (
+    <form onSubmit={handle} className="space-y-4">
+      <div className="form-group"><label className="form-label">Nama Target</label><input name="name" className="form-input" placeholder="Dana Darurat, Beli Motor" required /></div>
+      <div className="form-group"><label className="form-label">Target Nominal (IDR)</label><input name="target" type="number" className="form-input" placeholder="10000000" required /></div>
+      <div className="form-group"><label className="form-label">Tanggal Target</label><input name="deadline" type="date" className="form-input" /></div>
+      <button type="submit" className="btn btn-lime btn-full">Buat Target</button>
+    </form>
+  );
+}
+
+function DebtForm({ onSubmit }) {
+  const handle = (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const amount = parseFloat(fd.get('amount'));
+    if (!fd.get('name') || amount <= 0) return;
+    onSubmit({ name: fd.get('name'), amount, type: fd.get('type'), dueDate: fd.get('dueDate') });
+  };
+  return (
+    <form onSubmit={handle} className="space-y-4">
+      <div className="form-group"><label className="form-label">Nama / Keperluan</label><input name="name" className="form-input" placeholder="Budi, Tagihan Listrik" required /></div>
+      <div className="grid-2">
+        <div className="form-group"><label className="form-label">Nominal</label><input name="amount" type="number" className="form-input" placeholder="0" required /></div>
+        <div className="form-group"><label className="form-label">Jenis</label>
+          <select name="type" className="form-input"><option value="debt">Hutang (Saya)</option><option value="receivable">Piutang (Orang Lain)</option></select>
+        </div>
+      </div>
+      <div className="form-group"><label className="form-label">Jatuh Tempo</label><input name="dueDate" type="date" className="form-input" required /></div>
+      <button type="submit" className="btn btn-lime btn-full">Simpan</button>
+    </form>
+  );
+}
+
+function InvestForm({ onSubmit }) {
+  const handle = (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const value = parseFloat(fd.get('value'));
+    if (!fd.get('name') || value <= 0) return;
+    onSubmit({ name: fd.get('name'), value, qty: fd.get('qty'), type: fd.get('type') });
+  };
+  return (
+    <form onSubmit={handle} className="space-y-4">
+      <div className="form-group"><label className="form-label">Nama Aset</label><input name="name" className="form-input" placeholder="Emas, Saham BBCA" required /></div>
+      <div className="grid-2">
+        <div className="form-group"><label className="form-label">Nilai (IDR)</label><input name="value" type="number" className="form-input" placeholder="0" required /></div>
+        <div className="form-group"><label className="form-label">Jenis</label>
+          <select name="type" className="form-input"><option value="commodity">Emas/Komoditas</option><option value="mutual-fund">Reksadana</option><option value="stock">Saham</option><option value="crypto">Crypto</option><option value="other">Lainnya</option></select>
+        </div>
+      </div>
+      <div className="form-group"><label className="form-label">Kuantitas</label><input name="qty" className="form-input" placeholder="5 gram, 10 lot" /></div>
+      <button type="submit" className="btn btn-lime btn-full">Simpan Aset</button>
+    </form>
   );
 }
